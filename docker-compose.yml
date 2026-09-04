@@ -41,6 +41,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - AZURE_SPEECH_KEY=${AZURE_SPEECH_KEY}
       - AZURE_SPEECH_REGION=${AZURE_SPEECH_REGION}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
 
   # 3. THE CACHE (Redis)
   redis:
@@ -54,7 +55,7 @@ services:
     build: ./frontend
     container_name: kizuna_frontend
     environment:
-      - WATCHPACK_POLLING=true # Fix for hot-reload on Windows/Docker
+      - WATCHPACK_POLLING=true 
     ports:
       - "5173:5173"
     volumes:

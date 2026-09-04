@@ -1,5 +1,7 @@
 # backend/app/database.py
 import os
+import asyncpg
+import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
@@ -29,3 +31,12 @@ async def get_db():
             yield session
         finally:
             await session.close()
+
+async def connect_with_retry():
+    while True:
+        try:
+            print("⏳ Attempting to connect to database...")
+            return await asyncpg.connect(DATABASE_URL)
+        except Exception as e:
+            print(f"⚠️ Connection failed: {e}. Retrying in 2 seconds...")
+            await asyncio.sleep(2)

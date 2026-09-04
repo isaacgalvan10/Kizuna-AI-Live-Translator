@@ -6,6 +6,17 @@ class ConnectionManager:
         self.active_connections: dict[str, dict[str, list[WebSocket]]] = {}
         self.history_buffer: dict[str, dict[str, list[dict]]] = {}
 
+    def get_active_languages(self, room_id: str) -> list[str]:
+        """Returns a list of language codes that currently have active listeners."""
+        if room_id not in self.active_connections:
+            return []
+        
+        active_langs = []
+        for lang, websockets in self.active_connections[room_id].items():
+            if len(websockets) > 0:
+                active_langs.append(lang)
+        return active_langs
+
     async def connect(self, websocket: WebSocket, room_id: str, language: str):
         await websocket.accept()
         
