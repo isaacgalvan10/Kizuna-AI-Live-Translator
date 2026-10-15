@@ -17,6 +17,9 @@ export default defineConfig({
     host: true, // needed for the Docker Container port mapping to work
     strictPort: true,
     port: 5173, 
+    allowedHosts: [
+      '.ngrok-free.dev'
+    ],
   proxy: {
       '/api': {
         target: 'http://backend:8000', // Points to the Docker Service Name
