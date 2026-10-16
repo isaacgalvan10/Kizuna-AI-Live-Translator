@@ -33,7 +33,7 @@ export function PreacherDashboard({ roomId }: PreacherDashboardProps) {
           streamRef.current = stream;
 
           // 3. Initialize AudioContext at 16kHz (matching Azure's expected format)
-          const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+          const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
           const audioContext = new AudioContextClass({ sampleRate: 16000 });
           audioContextRef.current = audioContext;
 

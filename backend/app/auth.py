@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 import bcrypt
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
+import jwt
 
 SECRET_KEY = os.getenv("JWT_SECRET_KEY") or "kizuna-dev-secret-change-in-production"
 ALGORITHM = "HS256"
@@ -56,7 +56,7 @@ async def get_operator_claims(
         raise _unauthorized()
     try:
         claims = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-    except JWTError:
+    except jwt.InvalidTokenError:
         raise _unauthorized()
     if "church_id" not in claims:
         raise _unauthorized()

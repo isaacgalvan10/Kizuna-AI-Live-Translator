@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from jose import jwt
+import jwt
 
 from app.auth import ALGORITHM, SECRET_KEY, hash_password
 from app.models import User

@@ -99,7 +99,7 @@ export default function App() {
             }
           }
         } else if (payload.type === 'history') {
-          const validHistory = payload.data.filter((msg: any) => msg && msg.original !== undefined);
+          const validHistory = payload.data.filter((msg: TranslationMessage) => msg && msg.original !== undefined);
           setMessages(validHistory);
         }
       } catch (e) {
@@ -121,7 +121,8 @@ export default function App() {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         globalStream.current = stream;
 
-        audioContext.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+        const AudioContextCtor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        audioContext.current = new AudioContextCtor({ sampleRate: 16000 });
         const source = audioContext.current.createMediaStreamSource(stream);
         
         processor.current = audioContext.current.createScriptProcessor(4096, 1, 1);

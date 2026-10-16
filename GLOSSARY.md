@@ -85,7 +85,7 @@ The first screen after a QR scan. Offers English, Korean, and Chinese.
 _Avoid_: Hub, landing page
 
 **Guest Language**:
-One of English, Korean, or Chinese — the languages a live feed translates into. Simplified Chinese is not one.
+One of English, Korean, or Chinese — the languages a live feed translates into.
 _Avoid_: Locale, dialect
 
 **Listener View**:
