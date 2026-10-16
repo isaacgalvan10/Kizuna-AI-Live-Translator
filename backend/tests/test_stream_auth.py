@@ -61,23 +61,8 @@ def seed_file_database(db_path: Path) -> dict:
     return {"first": first_ids, "second": second_ids}
 
 
-def file_db_override(db_path: Path):
-    holder: dict = {}
-
-    async def override():
-        engine = holder.get("engine")
-        if engine is None:
-            engine = create_async_engine(f"sqlite+aiosqlite:///{db_path.as_posix()}")
-            holder["engine"] = engine
-        session_factory = async_sessionmaker(engine, expire_on_commit=False)
-        async with session_factory() as session:
-            yield session
-
-    return override
-
-
 @pytest.fixture
-def stream_db(tmp_path):
+def stream_db(tmp_path, file_db_override):
     db_path = tmp_path / "stream.db"
     ids = seed_file_database(db_path)
     app.dependency_overrides[get_db] = file_db_override(db_path)

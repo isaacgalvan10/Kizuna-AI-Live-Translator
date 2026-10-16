@@ -17,6 +17,9 @@ const LANGUAGES = [
   { code: 'zh-hans', label: '中文 (Chinese)' },
 ];
 
+const GLASS_CARD =
+  'bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl shadow-indigo-200/40 p-8 sm:p-12 w-full max-w-md border border-white/60 ring-1 ring-slate-900/5';
+
 export default function GuestLanding() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -66,11 +69,11 @@ export default function GuestLanding() {
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-screen p-4">
-        <div className="bg-white rounded-3xl shadow-2xl p-8 sm:p-12 w-full max-w-md border border-slate-100 text-center space-y-4">
+        <div className={`${GLASS_CARD} text-center space-y-4`}>
           <h1 className="text-4xl font-black tracking-tight text-indigo-600">絆 KIZUNA</h1>
           <p
             role="alert"
-            className="text-sm font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3"
+            className="text-sm font-bold text-rose-700 bg-rose-50/80 backdrop-blur-sm border border-rose-200/70 rounded-xl px-4 py-3"
           >
             {error}
           </p>
@@ -82,7 +85,7 @@ export default function GuestLanding() {
   if (!guest) {
     return (
       <div className="flex items-center justify-center min-h-screen p-4">
-        <div className="bg-white rounded-3xl shadow-2xl p-8 sm:p-12 w-full max-w-md border border-slate-100 text-center space-y-4">
+        <div className={`${GLASS_CARD} text-center space-y-4`}>
           <h1 className="text-4xl font-black tracking-tight text-indigo-600">絆 KIZUNA</h1>
           <p className="text-sm text-slate-500 font-bold uppercase tracking-widest">
             Connecting to your church…
@@ -94,7 +97,7 @@ export default function GuestLanding() {
 
   return (
     <div className="flex items-center justify-center min-h-screen p-4">
-      <div className="bg-white rounded-3xl shadow-2xl p-8 sm:p-12 w-full max-w-md border border-slate-100">
+      <div className={GLASS_CARD}>
         <div className="text-center mb-8">
           <h1 className="text-4xl font-black tracking-tight text-indigo-600 mb-2">絆 KIZUNA</h1>
           <p className="text-lg font-bold text-slate-900">{guest.church_name}</p>
@@ -104,7 +107,7 @@ export default function GuestLanding() {
         </div>
 
         {!guest.is_live && (
-          <p className="text-sm font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6 text-center">
+          <p className="text-sm font-medium text-amber-800 bg-amber-50/80 backdrop-blur-sm border border-amber-200/70 rounded-xl px-4 py-3 mb-6 text-center">
             The service hasn't started yet — pick a language now and you'll wait on the
             next screen until the operator begins.
           </p>
@@ -115,7 +118,7 @@ export default function GuestLanding() {
             <button
               key={language.code}
               onClick={() => pickLanguage(language.code)}
-              className="w-full py-5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-black rounded-2xl transition-all shadow-lg shadow-indigo-200 text-xl tracking-wide"
+              className="w-full cursor-pointer py-5 bg-gradient-to-b from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 active:from-indigo-700 active:to-indigo-800 text-white font-black rounded-2xl transition-colors duration-200 shadow-lg shadow-indigo-500/25 text-xl tracking-wide"
             >
               {language.label}
             </button>

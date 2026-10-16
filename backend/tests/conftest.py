@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite://")
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-kizuna")
@@ -14,6 +15,32 @@ from app.main import app
 from app.models import Church, User
 
 TEST_PASSWORD = "gracious-and-true"
+
+
+@pytest.fixture
+def file_db_override():
+    """Builds a get_db override backed by a temp *file* SQLite database.
+
+    TestClient runs the app on its own event loop, so WebSocket tests cannot
+    reuse the in-memory engine the other fixtures provide: the engine must be
+    created lazily inside a session that the app's loop owns.
+    """
+
+    def build(db_path: Path):
+        holder: dict = {}
+
+        async def override():
+            engine = holder.get("engine")
+            if engine is None:
+                engine = create_async_engine(f"sqlite+aiosqlite:///{db_path.as_posix()}")
+                holder["engine"] = engine
+            session_factory = async_sessionmaker(engine, expire_on_commit=False)
+            async with session_factory() as session:
+                yield session
+
+        return override
+
+    return build
 
 
 @pytest.fixture

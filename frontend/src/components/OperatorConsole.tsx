@@ -40,17 +40,17 @@ interface OperatorChurch {
 const FEED_STATE_UI: Record<FeedState, { label: string; pill: string; dot: string }> = {
   live: {
     label: 'Live',
-    pill: 'bg-emerald-50 border-emerald-300 text-emerald-800',
-    dot: 'bg-emerald-500 animate-pulse',
+    pill: 'bg-emerald-50/80 border-emerald-300/70 text-emerald-800',
+    dot: 'bg-emerald-500 motion-safe:animate-pulse',
   },
   paused: {
     label: 'Paused',
-    pill: 'bg-amber-50 border-amber-300 text-amber-800',
+    pill: 'bg-amber-50/80 border-amber-300/70 text-amber-800',
     dot: 'bg-amber-500',
   },
   stopped: {
     label: 'Stopped',
-    pill: 'bg-slate-100 border-slate-300 text-slate-600',
+    pill: 'bg-slate-100/80 border-slate-300/70 text-slate-600',
     dot: 'bg-slate-400',
   },
 };
@@ -63,7 +63,7 @@ function ErrorBanner({ message }: { message: string }) {
   return (
     <p
       role="alert"
-      className="text-sm font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3"
+      className="text-sm font-bold text-rose-700 bg-rose-50/80 backdrop-blur-sm border border-rose-200/70 rounded-xl px-4 py-3"
     >
       {message}
     </p>
@@ -340,7 +340,7 @@ export default function OperatorConsole() {
       <div className="flex items-center justify-center min-h-screen p-4">
         <form
           onSubmit={handleLogin}
-          className="bg-white rounded-3xl shadow-2xl p-8 sm:p-12 w-full max-w-md border border-slate-100"
+          className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl shadow-indigo-200/40 p-8 sm:p-12 w-full max-w-md border border-white/60 ring-1 ring-slate-900/5"
           aria-label="Operator login"
         >
           <div className="text-center mb-10">
@@ -364,7 +364,7 @@ export default function OperatorConsole() {
                 autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-4 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-medium text-slate-800 text-lg"
+                className="w-full px-4 py-4 bg-white/70 border border-slate-300/70 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors duration-200 font-medium text-slate-800 text-lg"
               />
             </div>
 
@@ -381,7 +381,7 @@ export default function OperatorConsole() {
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-4 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-medium text-slate-800 text-lg"
+                className="w-full px-4 py-4 bg-white/70 border border-slate-300/70 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors duration-200 font-medium text-slate-800 text-lg"
               />
             </div>
 
@@ -390,7 +390,7 @@ export default function OperatorConsole() {
             <button
               type="submit"
               disabled={isBusy}
-              className="w-full py-5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:bg-slate-300 text-white font-black rounded-2xl transition-all shadow-lg shadow-indigo-200 text-xl tracking-wide"
+              className="w-full cursor-pointer py-5 bg-gradient-to-b from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 active:from-indigo-700 active:to-indigo-800 disabled:from-slate-300 disabled:to-slate-300 text-white font-black rounded-2xl transition-colors duration-200 shadow-lg shadow-indigo-500/25 text-xl tracking-wide"
             >
               Log in
             </button>
@@ -402,11 +402,11 @@ export default function OperatorConsole() {
 
   return (
     <div className="max-w-3xl mx-auto pt-10 sm:pt-20 px-4">
-      <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-10 border border-slate-100">
+      <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl shadow-indigo-200/40 p-6 sm:p-10 border border-white/60 ring-1 ring-slate-900/5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
           <div>
             <h1 className="text-3xl font-black text-slate-900 tracking-tight">{church.name}</h1>
-            <p className="text-sm text-slate-500 font-mono mt-2 bg-slate-100 inline-block px-3 py-1 rounded">
+            <p className="text-sm text-slate-500 font-mono mt-2 bg-white/70 backdrop-blur-sm inline-block px-3 py-1 rounded">
               Room #{church.rooms[0]?.id}
             </p>
           </div>
@@ -414,7 +414,7 @@ export default function OperatorConsole() {
           <div
             role="status"
             aria-live="polite"
-            className={`flex items-center gap-3 px-5 py-3 rounded-full border font-black tracking-wide uppercase text-sm ${FEED_STATE_UI[status].pill}`}
+            className={`flex items-center gap-3 px-5 py-3 rounded-full border backdrop-blur-sm font-black tracking-wide uppercase text-sm ${FEED_STATE_UI[status].pill}`}
           >
             <span className={`h-3 w-3 rounded-full ${FEED_STATE_UI[status].dot}`} />
             {FEED_STATE_UI[status].label}
@@ -422,34 +422,34 @@ export default function OperatorConsole() {
         </div>
 
         {roomId === null ? (
-          <div className="p-8 bg-slate-50 rounded-2xl border border-slate-200 text-center">
+          <div className="p-8 bg-white/60 backdrop-blur-sm rounded-2xl border border-white/60 ring-1 ring-slate-900/5 text-center">
             <p className="text-base font-bold text-slate-600">
               No room configured for this church. Ask your church admin to set one up.
             </p>
           </div>
         ) : (
-          <div className="p-6 sm:p-10 bg-slate-50 rounded-2xl border border-slate-200 space-y-6">
+          <div className="p-6 sm:p-10 bg-white/50 backdrop-blur-sm rounded-2xl border border-white/60 ring-1 ring-slate-900/5 space-y-6">
             {error && <ErrorBanner message={error} />}
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <button
                 onClick={handleStart}
                 disabled={status === 'live'}
-                className="py-6 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-black rounded-2xl transition-all shadow-lg shadow-emerald-200/50 text-2xl tracking-wide"
+                className="py-6 cursor-pointer bg-gradient-to-b from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 active:from-emerald-700 active:to-emerald-800 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 text-white font-black rounded-2xl transition-colors duration-200 shadow-lg shadow-emerald-500/25 text-2xl tracking-wide"
               >
                 {status === 'paused' ? 'Resume' : 'Start'}
               </button>
               <button
                 onClick={handlePause}
                 disabled={status !== 'live'}
-                className="py-6 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-black rounded-2xl transition-all shadow-lg shadow-amber-200/50 text-2xl tracking-wide"
+                className="py-6 cursor-pointer bg-gradient-to-b from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 active:from-amber-700 active:to-amber-800 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 text-white font-black rounded-2xl transition-colors duration-200 shadow-lg shadow-amber-500/25 text-2xl tracking-wide"
               >
                 Pause
               </button>
               <button
                 onClick={handleStop}
                 disabled={status === 'stopped'}
-                className="py-6 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-black rounded-2xl transition-all shadow-lg shadow-rose-200/50 text-2xl tracking-wide"
+                className="py-6 cursor-pointer bg-gradient-to-b from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 active:from-rose-700 active:to-rose-800 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 text-white font-black rounded-2xl transition-colors duration-200 shadow-lg shadow-rose-500/25 text-2xl tracking-wide"
               >
                 Stop
               </button>
@@ -463,7 +463,7 @@ export default function OperatorConsole() {
           </div>
         )}
 
-        <div className="mt-6 p-6 sm:p-8 bg-white border border-slate-200 rounded-2xl">
+        <div className="mt-6 p-6 sm:p-8 bg-white/70 backdrop-blur-xl border border-white/60 ring-1 ring-slate-900/5 rounded-2xl">
           <div className="flex flex-col sm:flex-row items-center gap-6">
             <div className="bg-white p-3 border border-slate-200 rounded-xl shrink-0">
               <QRCodeCanvas
@@ -487,7 +487,7 @@ export default function OperatorConsole() {
               </p>
               <button
                 onClick={handleDownloadQr}
-                className="px-5 py-3 bg-slate-800 hover:bg-slate-900 active:bg-black text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-slate-300"
+                className="px-5 py-3 cursor-pointer bg-slate-800 hover:bg-slate-900 active:bg-black text-white text-sm font-bold rounded-xl transition-colors duration-200 shadow-lg shadow-slate-300/50"
               >
                 Download QR
               </button>
@@ -498,7 +498,7 @@ export default function OperatorConsole() {
         <div className="mt-8 flex justify-end">
           <button
             onClick={handleLogout}
-            className="px-6 py-3 text-sm font-bold text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
+            className="px-6 py-3 cursor-pointer text-sm font-bold text-slate-500 hover:text-rose-600 hover:bg-rose-50/80 rounded-xl transition-colors duration-200"
           >
             Log out
           </button>

@@ -24,22 +24,22 @@ interface TranslationMessage {
 const LISTENER_STATE_UI: Record<ListenerState, { label: string; pill: string; dot: string }> = {
   waiting: {
     label: 'Waiting',
-    pill: 'bg-slate-100 border-slate-300 text-slate-600',
+    pill: 'bg-white/60 border-slate-300/70 text-slate-600',
     dot: 'bg-slate-400',
   },
   live: {
     label: 'Live',
-    pill: 'bg-emerald-50 border-emerald-300 text-emerald-800',
-    dot: 'bg-emerald-500 animate-pulse',
+    pill: 'bg-emerald-50/80 border-emerald-300/70 text-emerald-800',
+    dot: 'bg-emerald-500 motion-safe:animate-pulse',
   },
   paused: {
     label: 'Paused',
-    pill: 'bg-amber-50 border-amber-300 text-amber-800',
+    pill: 'bg-amber-50/80 border-amber-300/70 text-amber-800',
     dot: 'bg-amber-500',
   },
   stopped: {
     label: 'Ended',
-    pill: 'bg-slate-100 border-slate-300 text-slate-600',
+    pill: 'bg-slate-100/80 border-slate-300/70 text-slate-600',
     dot: 'bg-slate-400',
   },
 };
@@ -211,13 +211,13 @@ export default function Listener() {
 
   return (
     <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-12 h-screen flex flex-col">
-      <div className="flex items-center justify-between gap-3 mb-4 shrink-0">
+      <div className="flex items-center justify-between gap-3 mb-4 shrink-0 bg-white/60 backdrop-blur-xl border border-white/60 ring-1 ring-slate-900/5 rounded-2xl px-4 py-3">
         <h2 className="text-2xl font-black text-slate-900 tracking-tight">Live Translation</h2>
         <div className="flex items-center gap-2">
           <span
             role="status"
             aria-live="polite"
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold tracking-wide uppercase ${LISTENER_STATE_UI[listenerState].pill}`}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full border backdrop-blur-sm text-xs font-bold tracking-wide uppercase ${LISTENER_STATE_UI[listenerState].pill}`}
           >
             <span className={`h-2 w-2 rounded-full ${LISTENER_STATE_UI[listenerState].dot}`} />
             {LISTENER_STATE_UI[listenerState].label}
@@ -225,10 +225,10 @@ export default function Listener() {
           <button
             onClick={toggleAudio}
             disabled={!audioAvailable}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide uppercase border transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide uppercase border backdrop-blur-sm cursor-pointer transition-colors duration-200 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed ${
               isAudioEnabled
-                ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
-                : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                ? 'bg-indigo-50/80 border-indigo-200/70 text-indigo-700 hover:bg-indigo-100/80'
+                : 'bg-white/60 border-slate-200/70 text-slate-500 hover:bg-white/80'
             }`}
           >
             {isAudioEnabled ? (
@@ -247,12 +247,12 @@ export default function Listener() {
       </div>
 
       {listenerState === 'paused' && (
-        <div className="mb-4 shrink-0 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 text-center font-bold text-sm">
+        <div className="mb-4 shrink-0 bg-amber-50/80 backdrop-blur-xl border border-amber-200/70 text-amber-800 rounded-xl px-4 py-3 text-center font-bold text-sm">
           Paused — worship music
         </div>
       )}
       {listenerState === 'stopped' && (
-        <div className="mb-4 shrink-0 bg-slate-100 border border-slate-300 text-slate-600 rounded-xl px-4 py-3 text-center font-bold text-sm">
+        <div className="mb-4 shrink-0 bg-slate-100/80 backdrop-blur-xl border border-slate-300/70 text-slate-600 rounded-xl px-4 py-3 text-center font-bold text-sm">
           Service ended
         </div>
       )}
@@ -263,9 +263,9 @@ export default function Listener() {
       >
         <div
           data-testid="japanese-panel"
-          className="order-2 md:order-none bg-slate-100/70 border border-slate-200/60 rounded-xl flex flex-col min-h-0 flex-[2] md:flex-none overflow-hidden"
+          className="order-2 md:order-none bg-white/60 backdrop-blur-xl border border-white/60 ring-1 ring-slate-900/5 rounded-xl flex flex-col min-h-0 flex-[2] md:flex-none overflow-hidden"
         >
-          <div className="px-5 py-3.5 bg-slate-200/50 border-b border-slate-200 text-xs font-bold tracking-wider text-slate-500 uppercase shrink-0">
+          <div className="px-5 py-3.5 bg-white/40 border-b border-white/60 text-xs font-bold tracking-wider text-slate-500 uppercase shrink-0">
             日本語 (Transcript)
           </div>
           <div
@@ -276,15 +276,15 @@ export default function Listener() {
             {messages.map((msg, index) => (
               <div
                 key={`ja-${index}`}
-                className="bg-white p-4 rounded-xl border border-slate-200/50 shadow-xs text-slate-800 text-base leading-relaxed"
+                className="bg-white/80 p-4 rounded-xl border border-slate-200/60 shadow-xs text-slate-800 text-base leading-relaxed"
               >
                 {msg.original}
               </div>
             ))}
             {interimMessage?.original && (
-              <div className="bg-white/60 p-4 rounded-xl border border-dashed border-slate-300 shadow-xs text-slate-400 text-base leading-relaxed italic opacity-80">
+              <div className="bg-white/50 p-4 rounded-xl border border-dashed border-slate-300 shadow-xs text-slate-400 text-base leading-relaxed italic opacity-80">
                 {interimMessage.original}
-                <span className="inline-block w-1.5 h-4 bg-slate-400 animate-pulse ml-1 align-middle rounded-xs" />
+                <span className="inline-block w-1.5 h-4 bg-slate-400 motion-safe:animate-pulse ml-1 align-middle rounded-xs" />
               </div>
             )}
           </div>
@@ -292,9 +292,9 @@ export default function Listener() {
 
         <div
           data-testid="translation-panel"
-          className="order-1 md:order-none bg-white border border-slate-200 rounded-xl flex flex-col min-h-0 flex-[3] md:flex-none overflow-hidden shadow-xs"
+          className="order-1 md:order-none bg-white/75 backdrop-blur-xl border border-white/60 ring-1 ring-slate-900/5 rounded-xl flex flex-col min-h-0 flex-[3] md:flex-none overflow-hidden shadow-xs"
         >
-          <div className="px-5 py-3.5 bg-indigo-50/50 border-b border-indigo-100 text-xs font-bold tracking-wider text-indigo-600 uppercase shrink-0">
+          <div className="px-5 py-3.5 bg-indigo-50/60 border-b border-indigo-100/70 text-xs font-bold tracking-wider text-indigo-600 uppercase shrink-0">
             {lang?.toUpperCase()} (Translation)
           </div>
           <div
@@ -312,7 +312,7 @@ export default function Listener() {
             {messages.map((msg, index) => (
               <div
                 key={`translation-${index}`}
-                className="bg-slate-50 p-4 rounded-xl border-l-4 border-indigo-500 text-slate-900 text-base leading-relaxed shadow-2xs"
+                className="bg-slate-50/80 p-4 rounded-xl border-l-4 border-indigo-500 text-slate-900 text-base leading-relaxed shadow-2xs"
               >
                 {msg.translation}
               </div>
@@ -320,7 +320,7 @@ export default function Listener() {
             {interimMessage?.translation && (
               <div className="bg-slate-50/50 p-4 rounded-xl border-l-4 border-dashed border-indigo-300 text-slate-500 text-base leading-relaxed italic opacity-75">
                 {interimMessage.translation}
-                <span className="inline-block w-1.5 h-4 bg-indigo-400 animate-pulse ml-1 align-middle rounded-xs" />
+                <span className="inline-block w-1.5 h-4 bg-indigo-400 motion-safe:animate-pulse ml-1 align-middle rounded-xs" />
               </div>
             )}
           </div>
