@@ -35,7 +35,7 @@ A real-time translation system where:
 - **Church tenancy**: Add `church_id` column to `User` model (nullable for guests). Scope all operator queries by `church_id`.
 - **Operator auth**: New `/api/operator/login` endpoint accepting email/password, returning JWT with `church_id` claim. Protect `/ws/stream/{room_id}` and operator control endpoints with this auth.
 - **Live feed control**: Add `is_live` toggle on `Room` (already exists). Operator POST `/api/operator/rooms/{room_id}/start`, `/pause`, `/stop` to control feed state. Broadcast `feed_state` events to listeners via WebSocket.
-- **QR join API**: Existing `POST /api/join/{qr_code_hash}` returns `is_live`, `room_id`, `church_name`. No changes needed.
+- **QR join API**: `POST /api/join/{qr_code_hash}` returns `is_live`, `room_id`, `church_name`. Resolves to the church's live room when one is running and its first room otherwise (room_id is null only when the church has no room), so a guest who scans before the feed starts can already wait.
 - **Audio source**: Operator laptop captures from mixer aux via `getUserMedia` (existing `/preacher` route already does this). No backend change.
 - **TTS**: Browser `speechSynthesis` on listener (existing). Server TTS not implemented; fallback documented only.
 

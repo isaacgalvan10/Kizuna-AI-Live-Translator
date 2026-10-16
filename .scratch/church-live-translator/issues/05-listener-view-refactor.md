@@ -19,3 +19,7 @@
   - Language change: cancel current, prime new voice
   - Pause event: cancel TTS immediately
 - [ ] Test: stacked layout on mobile; waiting state shows before operator starts; paused banner appears on Pause; TTS toggles and cancels correctly; desktop two-pane unchanged
+
+## Comments
+
+- Landing contract from ticket 04: `GuestLanding` navigates to `/listen/{room_id}/{lang}` with router state `{ isLive: boolean }` taken from the join response. Router state survives only the in-app navigation (lost on refresh or a directly opened URL), so the listener view should treat `feed_state` WebSocket events as the source of truth after mount and keep its Waiting state until an event says otherwise.

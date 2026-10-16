@@ -16,6 +16,7 @@ const TOKEN_KEY = 'kizuna_operator_token';
 const CHURCH = {
   id: 7,
   name: 'Kizuna Test Church',
+  qr_code_hash: 'test-qr-hash',
   rooms: [{ id: 3, is_live: false }],
 };
 
@@ -102,15 +103,22 @@ async function renderConsoleWithStoredSession() {
   await screen.findByText('Kizuna Test Church');
 }
 
+const originalGetContext = HTMLCanvasElement.prototype.getContext;
+
 beforeEach(() => {
   localStorage.clear();
   vi.clearAllMocks();
   FakeWebSocket.reset();
   vi.stubGlobal('WebSocket', FakeWebSocket);
   stubAudioCapture();
+  // jsdom has no 2D canvas; qrcode.react bails out cleanly when getContext is
+  // null, but jsdom's "not implemented" notice floods the test log without this.
+  HTMLCanvasElement.prototype.getContext =
+    (() => null) as typeof HTMLCanvasElement.prototype.getContext;
 });
 
 afterEach(() => {
+  HTMLCanvasElement.prototype.getContext = originalGetContext;
   vi.unstubAllGlobals();
 });
 
@@ -382,6 +390,37 @@ describe('feed state over WebSocket', () => {
     render(<OperatorConsole />);
 
     expect(await screen.findByRole('status')).toHaveTextContent('Live');
+  });
+});
+
+describe('guest QR code', () => {
+  it('shows the permanent join link for this church', async () => {
+    await renderConsoleWithStoredSession();
+
+    expect(screen.getByText('Guest QR')).toBeInTheDocument();
+    expect(
+      screen.getByText(`${window.location.origin}/?qr=test-qr-hash`)
+    ).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /guest qr code/i })).toBeInTheDocument();
+  });
+
+  it('downloads the QR as a PNG for printing', async () => {
+    const user = userEvent.setup();
+    await renderConsoleWithStoredSession();
+    const toDataURL = vi
+      .spyOn(HTMLCanvasElement.prototype, 'toDataURL')
+      .mockReturnValue('data:image/png;base64,qr-bytes');
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => {});
+
+    await user.click(screen.getByRole('button', { name: /download/i }));
+
+    expect(toDataURL).toHaveBeenCalledWith('image/png');
+    expect(click).toHaveBeenCalledTimes(1);
+
+    toDataURL.mockRestore();
+    click.mockRestore();
   });
 });
 

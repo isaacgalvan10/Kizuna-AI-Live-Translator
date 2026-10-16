@@ -10,6 +10,7 @@ from fastapi import (
 )
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import update
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,7 +30,7 @@ from .socket_manager import (
     FeedState,
     manager,
 )
-from .models import Church, Room, User
+from .models import Church, Room, User, new_qr_hash
 from .schemas import (
     FeedControlResponse,
     GuestJoinResponse,
@@ -136,12 +137,17 @@ async def silent_guest_login(qr_code_hash: str, db: AsyncSession = Depends(get_d
     if not church:
         raise HTTPException(status_code=404, detail="Invalid QR code. Church not found.")
 
-    room_query = select(Room).where(Room.church_id == church.id, Room.is_live == True)
-    room_result = await db.execute(room_query)
-    active_room = room_result.scalar_one_or_none()
-
-    is_live = active_room is not None
-    room_id = active_room.id if active_room else None
+    # A scanned code resolves to the church's live room when one is running and
+    # to its first room otherwise, so a guest can already wait before the feed
+    # starts. room_id is only null when the church has no room at all.
+    room = (
+        await db.execute(
+            select(Room)
+            .where(Room.church_id == church.id)
+            .order_by(Room.is_live.desc(), Room.id)
+            .limit(1)
+        )
+    ).scalars().first()
 
     new_guest = User(is_guest=True)
     db.add(new_guest)
@@ -152,8 +158,8 @@ async def silent_guest_login(qr_code_hash: str, db: AsyncSession = Depends(get_d
         status="success",
         user_id=new_guest.id,
         church_name=church.name,
-        is_live=is_live,
-        room_id=room_id
+        is_live=bool(room and room.is_live),
+        room_id=room.id if room else None
     )
 
 @app.post("/api/operator/login", response_model=OperatorLoginResponse)
@@ -186,6 +192,19 @@ async def operator_church(
     if church is None:
         raise HTTPException(status_code=404, detail="Church not found")
 
+    # The QR hash is the church's permanent identity: generated once, never
+    # tied to the operator login, so printed codes survive password rotations.
+    # The conditional UPDATE keeps concurrent first loads from minting two
+    # different hashes for the same church.
+    if church.qr_code_hash is None:
+        await db.execute(
+            update(Church)
+            .where(Church.id == church.id, Church.qr_code_hash.is_(None))
+            .values(qr_code_hash=new_qr_hash())
+        )
+        await db.commit()
+        await db.refresh(church)
+
     rooms = (
         await db.execute(select(Room).where(Room.church_id == church_id).order_by(Room.id))
     ).scalars().all()
@@ -193,6 +212,7 @@ async def operator_church(
     return OperatorChurchResponse(
         id=church.id,
         name=church.name,
+        qr_code_hash=church.qr_code_hash,
         rooms=[RoomSummary(id=room.id, is_live=room.is_live) for room in rooms],
     )
 

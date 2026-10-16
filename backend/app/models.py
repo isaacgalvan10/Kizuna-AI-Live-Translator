@@ -3,13 +3,16 @@ from sqlalchemy.orm import relationship
 from .database import Base
 import uuid
 
+def new_qr_hash() -> str:
+    return str(uuid.uuid4())
+
 class Church(Base):
     __tablename__ = "churches"
     
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     # A permanent, unique string to generate the QR code
-    qr_code_hash = Column(String, unique=True, index=True, default=lambda: str(uuid.uuid4()))
+    qr_code_hash = Column(String, unique=True, index=True, default=new_qr_hash)
     
     rooms = relationship("Room", back_populates="church")
 

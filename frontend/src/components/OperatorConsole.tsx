@@ -1,10 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { isAxiosError } from 'axios';
+import { QRCodeCanvas } from 'qrcode.react';
 import api from '../api';
 
 const TOKEN_STORAGE_KEY = 'kizuna_operator_token';
 const WS_ORIGIN = 'ws://localhost:8000';
+// The QR must encode the address guests can actually reach. In production that
+// is the app's own origin; VITE_PUBLIC_ORIGIN overrides it for setups where the
+// operator's URL (e.g. localhost) differs from the guests' URL.
+const PUBLIC_ORIGIN = import.meta.env.VITE_PUBLIC_ORIGIN || window.location.origin;
+
+function guestJoinUrl(qrHash: string) {
+  return `${PUBLIC_ORIGIN}/?qr=${encodeURIComponent(qrHash)}`;
+}
+
+function qrFileName(churchName: string) {
+  const slug = churchName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return `kizuna-${slug || 'church'}-qr.png`;
+}
 
 type FeedState = 'live' | 'paused' | 'stopped';
 
@@ -16,6 +33,7 @@ interface RoomSummary {
 interface OperatorChurch {
   id: number;
   name: string;
+  qr_code_hash: string;
   rooms: RoomSummary[];
 }
 
@@ -65,6 +83,7 @@ export default function OperatorConsole() {
 
   const feedStateWs = useRef<WebSocket | null>(null);
   const streamWs = useRef<WebSocket | null>(null);
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const audioContext = useRef<AudioContext | null>(null);
   const processor = useRef<ScriptProcessorNode | null>(null);
   const microphoneStream = useRef<MediaStream | null>(null);
@@ -307,6 +326,15 @@ export default function OperatorConsole() {
     socket?.close();
   };
 
+  const handleDownloadQr = () => {
+    const canvas = qrCanvasRef.current;
+    if (!canvas || !church) return;
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL('image/png');
+    link.download = qrFileName(church.name);
+    link.click();
+  };
+
   if (!token || !church) {
     return (
       <div className="flex items-center justify-center min-h-screen p-4">
@@ -434,6 +462,38 @@ export default function OperatorConsole() {
             </p>
           </div>
         )}
+
+        <div className="mt-6 p-6 sm:p-8 bg-white border border-slate-200 rounded-2xl">
+          <div className="flex flex-col sm:flex-row items-center gap-6">
+            <div className="bg-white p-3 border border-slate-200 rounded-xl shrink-0">
+              <QRCodeCanvas
+                ref={qrCanvasRef}
+                value={guestJoinUrl(church.qr_code_hash)}
+                size={512}
+                level="M"
+                marginSize={4}
+                style={{ width: 176, height: 176 }}
+                aria-label="Guest QR code"
+              />
+            </div>
+            <div className="text-center sm:text-left space-y-2 min-w-0">
+              <h2 className="text-lg font-black text-slate-900">Guest QR</h2>
+              <p className="text-sm text-slate-500 font-medium">
+                Print this code and place it where guests can scan it. It is permanent for
+                this church — the same QR keeps working when the operator password changes.
+              </p>
+              <p className="text-xs font-mono text-slate-600 break-all">
+                {guestJoinUrl(church.qr_code_hash)}
+              </p>
+              <button
+                onClick={handleDownloadQr}
+                className="px-5 py-3 bg-slate-800 hover:bg-slate-900 active:bg-black text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-slate-300"
+              >
+                Download QR
+              </button>
+            </div>
+          </div>
+        </div>
 
         <div className="mt-8 flex justify-end">
           <button

@@ -43,6 +43,7 @@ class RoomSummary(BaseModel):
 class OperatorChurchResponse(BaseModel):
     id: int
     name: str
+    qr_code_hash: str
     rooms: list[RoomSummary]
 
 # What the API returns after the operator controls the live feed
@@ -54,8 +55,8 @@ class GuestJoinResponse(BaseModel):
     status: str
     user_id: int              # The silent guest ID
     church_name: str
-    is_live: bool             # The traffic cop flag (True = Live Room, False = Waiting Room)
-    room_id: Optional[int]    # Null if not live, an Integer if live
+    is_live: bool             # True once the operator has started the feed
+    room_id: Optional[int]    # Room to listen in, or to wait in; null only when the church has no room
 
     class Config:
         from_attributes = True
