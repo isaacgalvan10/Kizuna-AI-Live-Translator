@@ -9,6 +9,7 @@ from fastapi import (
     status,
 )
 from contextlib import asynccontextmanager
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -56,6 +57,18 @@ async def lifespan(app: FastAPI):
 
 # Initialize FastAPI
 app = FastAPI(lifespan=lifespan, title="Kizuna API")
+
+# The React dev server runs on its own origin (5173), so the browser requires
+# the API to opt in to cross-origin calls. Only the local dev origins are allowed;
+# tighten this when a real deployment origin exists.
+DEV_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=DEV_ORIGINS,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/api/health")
 async def health_check():
