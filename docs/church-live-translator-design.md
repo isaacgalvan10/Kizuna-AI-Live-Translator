@@ -65,8 +65,8 @@ Design a real-time translator for a Japanese Christian church service in Osaka: 
 ## Routine Choices (Non-Durable)
 
 ### Q5: Which languages sit on the QR picker?
-**Decision: A** — English, Korean, 繁體中文 only.
-Simplified Chinese dropped consciously; adding it later is a one-line picker change once TTS and prompts are ready.
+**Decision: A** — English, Korean, 中文 (Chinese) only.
+Originally shipped as 繁體中文 (Traditional); the user switched it to a single plain Chinese option in Simplified (`zh-hans`, zh-CN voice) after testing the picker — Simplified is the native script for the largest audience, and Traditional readers generally follow it. Traditional stays a one-line picker change: the Gemini prompt and both language codes already exist.
 
 ### Q8: How does Japanese sit next to the translation on a phone?
 **Decision: B** — Stacked: translation on top, Japanese scrolling underneath, both always visible.

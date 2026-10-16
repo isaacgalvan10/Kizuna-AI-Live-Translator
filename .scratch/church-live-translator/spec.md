@@ -19,7 +19,7 @@ A real-time translation system where:
 1. As an **operator**, I want to open a bookmarked URL on the mixer laptop and click **Start Live Feed**, so that the sermon audio begins streaming to the backend without typing credentials.
 2. As an **operator**, I want to click **Pause** during worship music and **Resume** when the sermon continues, so that guests don't hear songs translated over their headphones.
 3. As an **operator**, I want to click **Stop** after the service ends, so that the live feed ends cleanly.
-4. As a **guest**, I want to scan a QR code on my phone and immediately see a language picker (English, Korean, 繁體中文), so I can choose my language without entering a room ID.
+4. As a **guest**, I want to scan a QR code on my phone and immediately see a language picker (English, Korean, 中文), so I can choose my language without entering a room ID.
 5. As a **guest**, I want to pick a language and land on the listener view showing Japanese transcript stacked above the translation, so I can follow along visually.
 6. As a **guest**, I want to toggle **Audio: ON** and hear the translation via my phone's browser TTS in my chosen language, so I can listen on headphones.
 7. As a **guest**, if I scan the QR before the operator starts, I want to pick my language and wait on the listener view with a "Waiting for operator" message, so I don't need to scan again when the service begins.
@@ -80,7 +80,7 @@ A real-time translation system where:
 - Automatic music detection for pause/resume (deferred per Q3)
 - Per-volunteer operator accounts (deferred per Q7)
 - Server-side TTS (deferred per Q9 — only if browser voices fail real-device testing)
-- Simplified Chinese language support (deferred per Q5)
+- Traditional Chinese language support (the picker ships a single plain Chinese option in Simplified; reversed from the original Q5 decision after user testing — reverting is a one-line picker change)
 - Admin UI for creating churches/operators (manual DB seed or CLI for MVP)
 - HTTPS/WSS for production (assume LAN HTTP for Osaka Sunday)
 

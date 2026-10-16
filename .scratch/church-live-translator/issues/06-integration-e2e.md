@@ -11,7 +11,7 @@
 - [ ] Test Stop: operator clicks Stop → guest sees "Service ended", Audio disabled
 - [ ] Test tenancy: create second church in DB; verify its operator cannot control first church's room; its QR only joins its room
 - [ ] Test pre-service scan: guest scans QR before operator starts → picks language → waits → operator starts → guest immediately sees translations (no re-scan)
-- [ ] Real-device TTS test: open listener view on iOS Safari and Android Chrome; verify EN/KO/zh-TW voices are intelligible; document any language needing server TTS fallback
+- [ ] Real-device TTS test: open listener view on iOS Safari and Android Chrome; verify EN/KO/zh-CN voices are intelligible; document any language needing server TTS fallback
 - [ ] Clean up: remove deprecated `/preacher` route and `PreacherDashboard` component
 - [ ] Update `/api/dev/seed` to create test operator user with `is_guest=false` and `church_id`
 - [ ] Test: all acceptance criteria from spec.md pass

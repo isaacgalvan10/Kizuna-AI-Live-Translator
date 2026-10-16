@@ -14,7 +14,7 @@ interface GuestJoin {
 const LANGUAGES = [
   { code: 'en', label: 'English' },
   { code: 'ko', label: '한국어 (Korean)' },
-  { code: 'zh-hant', label: '繁體中文 (Traditional Chinese)' },
+  { code: 'zh-hans', label: '中文 (Chinese)' },
 ];
 
 export default function GuestLanding() {

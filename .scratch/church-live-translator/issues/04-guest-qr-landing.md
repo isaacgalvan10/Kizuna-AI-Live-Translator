@@ -13,7 +13,7 @@
 - [x] Response handling:
   - If `is_live=true` → navigate to `/listen/{room_id}/{lang}` with picked language
   - If `is_live=false` → show language picker, then navigate to `/listen/{room_id}/{lang}` with `is_live=false` (waiting state)
-- [x] Language picker: three options (en, ko, zh-hant) — no zh-hans per spec
+- [x] Language picker: three options (en, ko, zh-hans) — plain Chinese, Simplified per user decision
 - [x] No room ID input, no Broadcaster button, no church/room selector
 - [x] Test: QR URL with valid hash → language picker → listener view; QR URL before operator starts → language picker → waiting state; invalid hash → error
 
@@ -26,3 +26,4 @@ Scope additions beyond the checklist, all required to make the checklist work or
 - **QR origin**: `PUBLIC_ORIGIN = import.meta.env.VITE_PUBLIC_ORIGIN ?? window.location.origin`. In production the page origin is the deployed URL; set `VITE_PUBLIC_ORIGIN` when the operator's URL differs from the guests' reachable URL (e.g. local dev on `localhost:5173`).
 - **Old hub and `/listener` route removed** from `App.tsx`: `/` is now guest-only (no room ID, no Broadcaster button, no church/room selector) and `/operate` is unchanged. The old listener view + WebSocket/TTS code was deleted rather than left on a dead route; ticket 05 builds `/listen/:roomId/:lang` fresh. Until 05 lands, a successful scan navigates to a route that does not exist yet (agreed scope: ticket 04 only).
 - Tests: `backend/tests/test_join.py` (6, join seam), `frontend/src/components/GuestLanding.test.tsx` (7, scan flow + error paths), `OperatorConsole.test.tsx` +2 (QR link shown, PNG download fires `toDataURL` + anchor click). Full suites: backend 51 passing, frontend 28 passing; `npm run build` and `npm run lint` clean.
+- Chinese option changed after user testing: the picker now ships `zh-hans` labelled 中文 (Chinese) instead of 繁體中文 (Traditional Chinese). Rationale: Simplified is the native script for the largest audience and most Traditional readers follow it; the audio is identical since spoken Mandarin is the same. Spec, design doc Q5, and ticket 06's TTS check were updated to match.

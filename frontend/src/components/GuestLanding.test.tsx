@@ -80,9 +80,9 @@ describe('a scanned QR code', () => {
     renderLanding('/?qr=test-hash-123');
 
     expect(await screen.findByText(/hasn't started/i)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /traditional chinese/i }));
+    await user.click(screen.getByRole('button', { name: /chinese/i }));
 
-    expect(screen.getByTestId('listen-probe')).toHaveTextContent('3|zh-hant|false');
+    expect(screen.getByTestId('listen-probe')).toHaveTextContent('3|zh-hans|false');
   });
 });
 
