@@ -18,6 +18,22 @@ class ChurchResponse(ChurchBase):
         # Tells Pydantic to read data even if it's not a dict (like a SQLAlchemy model)
         from_attributes = True
 
+# What the operator console sends to log in
+class OperatorLoginRequest(BaseModel):
+    email: str
+    password: str
+
+# What the API returns after a successful operator login
+class OperatorLoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    church_id: int
+
+# What the API returns for the authenticated operator
+class OperatorProfileResponse(BaseModel):
+    email: str
+    church_id: int
+
 # What the API returns after a successful QR scan
 class GuestJoinResponse(BaseModel):
     status: str

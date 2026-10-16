@@ -29,3 +29,6 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=True) # Nullable for guests
     hashed_password = Column(String, nullable=True)
     is_guest = Column(Boolean, default=True)
+    church_id = Column(Integer, ForeignKey("churches.id"), nullable=True)
+
+    church = relationship("Church")
