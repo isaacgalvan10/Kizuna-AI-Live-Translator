@@ -1,6 +1,6 @@
 # 04: Guest QR landing page
 
-**What to build:** New landing page at `/` (replaces current hub): QR code scans land here → language picker only (English, Korean, 繁體中文) → no room ID input, no Broadcaster button. POSTs to `/api/join/{qr_hash}`, then navigates to `/listen/{room_id}/{lang}`.
+**What to build:** New landing page at `/` (replaces current hub): QR code scans land here → language picker only (English, Korean, Chinese) → no room ID input, no Broadcaster button. POSTs to `/api/join/{qr_hash}`, then navigates to `/listen/{room_id}/{lang}`.
 
 **Blocked by:** None (can start immediately)
 

@@ -4,7 +4,7 @@ Status: ready-for-agent
 
 ## Problem Statement
 
-Japanese Christian churches in Osaka need a real-time AI translation system for their services. Attendees who don't speak Japanese (English, Korean, Traditional Chinese speakers) cannot follow the sermon. The current Kizuna app has a landing page that exposes operator controls (room ID input, Broadcaster button) to guests, uses the operator's device microphone (picking up congregation noise), and lacks a pause mechanism for worship music. The system must: transcribe Japanese audio (with occasional English words and multiple speakers), show translations stacked on mobile, let attendees listen via headphones on their own phones, pause during worship, and join by scanning a QR code after an operator starts the live feed.
+Japanese Christian churches in Osaka need a real-time AI translation system for their services. Attendees who don't speak Japanese (English, Korean, Chinese speakers) cannot follow the sermon. The current Kizuna app has a landing page that exposes operator controls (room ID input, Broadcaster button) to guests, uses the operator's device microphone (picking up congregation noise), and lacks a pause mechanism for worship music. The system must: transcribe Japanese audio (with occasional English words and multiple speakers), show translations stacked on mobile, let attendees listen via headphones on their own phones, pause during worship, and join by scanning a QR code after an operator starts the live feed.
 
 ## Solution
 
