@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import GuestLanding from './components/GuestLanding';
+import Listener from './components/Listener';
 import OperatorConsole from './components/OperatorConsole';
 
 export default function App() {
@@ -9,7 +10,10 @@ export default function App() {
         {/* VIEW 1: GUEST QR LANDING (language picker for scanned pew codes) */}
         <Route path="/" element={<GuestLanding />} />
 
-        {/* VIEW 2: OPERATOR CONSOLE (operator login + feed control) */}
+        {/* VIEW 2: GUEST LISTENER VIEW (transcript + translation, headphone audio) */}
+        <Route path="/listen/:roomId/:lang" element={<Listener />} />
+
+        {/* VIEW 3: OPERATOR CONSOLE (operator login + feed control) */}
         <Route path="/operate" element={<OperatorConsole />} />
       </Routes>
     </div>

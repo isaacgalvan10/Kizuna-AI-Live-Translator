@@ -15,3 +15,7 @@
 - [ ] Clean up: remove deprecated `/preacher` route and `PreacherDashboard` component
 - [ ] Update `/api/dev/seed` to create test operator user with `is_guest=false` and `church_id`
 - [ ] Test: all acceptance criteria from spec.md pass
+
+## Comments
+
+- Known limitation from ticket 05: a guest who refreshes while the feed is paused lands on "Waiting" instead of "Paused". `Room.is_live` stays true through a pause (needed so the QR join still resolves to the room), so the boolean cannot distinguish paused from waiting on connect. Options if it matters in practice: persist a tri-state feed state on `Room`, or send the last broadcast state to a room on WebSocket connect.
