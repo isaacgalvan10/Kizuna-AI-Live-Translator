@@ -1,0 +1,705 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kizuna UI redesign — palette &amp; surfaces · prototype v4</title>
+<!--
+  Topic: Kizuna UI redesign — palette & surfaces (grill-with-ui · prototype v4, redraw — the settled final design).
+
+  Reflects (all six answered — no assumed regions):
+    q1 "Base mode"             → C — light-first, deep and colourful; no white page.
+    q2 "Identity palette"      → C — deep evergreen + warm sand.
+    q3 "Glassmorphism gone"    → A — solid layered surfaces: tone steps + 1px borders, no blur.
+    q4 "Reskin or restructure" → B — reskin + light structural tuning; the two-panel structure stays exactly.
+    q5 "Type voice"            → A — serif reading lines (Noto Serif JP), sans chrome (Noto Sans JP).
+    q6 "Listener tuning"       → B — chrome + reading polish: quiet header, reading measure, interim pulse.
+
+  Baked in (locked feedback, drawn explicitly):
+    · State colours outrank the brand palette. The LIVE pill stays feed-emerald — brighter
+      than the evergreen brand — with its pulsing dot, and the operator's Start stays
+      emerald with a play glyph. Brand evergreen appears elsewhere only (brand mark,
+      links, focus, login/language actions) so the two never read as the same signal.
+    · Both listener panels read as text: translation and Japanese transcript lines flow
+      as borderless serif sentences/short paragraphs with space between them — no
+      per-line boxes or cards. Only the interim (live-edge) line keeps its breathing pulse.
+
+  Redraw v3→v4:
+    · q2 formally answered C, q3 formally answered A — the "your lean — answer pending"
+      reference strips (old sections 04/05: q2 palettes, q3 surfaces) are removed
+      entirely; the file now shows only the settled design on all three full screens.
+    · Board chips and every frame tag moved from lean/pending to settled/answered.
+    · The emerald LIVE pill + emerald Start and the flowing-text treatment in both
+      panels are now stated explicitly (header, tags, footer).
+    · Everything else stays as v3: serif reading type, quiet header, reading measure,
+      breathing interim pulse, the single static background wash, the white QR card.
+
+  Change to an existing app: reproduces the three real views from frontend/src/components
+  (GuestLanding, Listener, OperatorConsole) + App.tsx routes, with real copy and controls:
+    01 listener  /listen/1/en — transcript + translation, waiting/live/paused/ended, audio toggle
+    02 operator  /operate     — login card, Start/Pause/Stop, feed pill, QR card + download
+    03 guest     /?qr=...     — English / 한국어 / 中文, not-started notice
+  Fonts: Noto Serif JP / Noto Sans JP are named first in the stacks; this offline frame has
+  no network (sandbox), so system stand-ins render: Hiragino Mincho ProN / Yu Mincho /
+  Georgia (serif), Hiragino Kaku Gothic ProN / Yu Gothic UI / Malgun Gothic / Microsoft
+  YaHei (sans).
+  Self-contained: inline CSS/JS, system fonts, no network requests.
+-->
+<style>
+:root{
+  /* board chrome — the review layer, neutral to contrast the warm app (not an app surface) */
+  --board-bg:#E9E7EE; --board-bar:#F4F3F7; --board-line:#D8D5E0;
+  --board-ink:#3B3744; --dim:#635E70; --faint:#8B8698;
+
+  /* palette C — deep evergreen + warm sand (q2: settled) */
+  --deep:#E7DCC0; --base:#F0E7D0; --panel:#F3ECD9; --card:#F7F1E0; --raise:#FBF6EA;
+  --line:#DCCEAE; --line-soft:#E7DCC2; --tint:rgba(30,98,72,.10);
+  /* ink — warm neutrals into deep pine */
+  --ink-900:#1E3B2C; --text:#4C4A36; --text-dim:#6E6B52; --text-mute:#8C8869; --read:#3E3A28;
+  /* brand — deep evergreen (low-luminance; never used on feed controls) */
+  --brand:#1E6248; --brand-deep:#174D39; --brand-soft:rgba(30,98,72,.08); --brand-wash:rgba(30,98,72,.15);
+  --brand-line:rgba(30,98,72,.36); --brand-ink:#F2EDDC;
+  --accent:#1E6248; --accent-deep:#174D39; --accent-line:rgba(30,98,72,.34);
+  --btn-grad:linear-gradient(180deg,#257357,#1B5A43); --btn-border:#174D39; --btn-ink:#F2EDDC;
+  /* feed states — semantic; LIVE stays brighter than the brand and pulsing (state outranks brand) */
+  --emerald:#10B981; --emerald-text:#07714B; --emerald-bg:rgba(16,180,120,.15); --emerald-line:rgba(10,160,105,.42);
+  --amber:#D9880A; --amber-text:#8A5A06; --amber-bg:rgba(217,136,10,.14); --amber-line:rgba(217,136,10,.38);
+  --rose:#E0486B; --rose-text:#A32C4C; --rose-bg:rgba(225,29,72,.11); --rose-line:rgba(225,29,72,.32);
+  --grey-text:#7A7260; --grey-bg:rgba(120,110,85,.10); --grey-line:rgba(120,110,85,.26); --grey-dot:#9A9078;
+
+  --font-sans:"Noto Sans JP",ui-sans-serif,system-ui,"Segoe UI","Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI",Meiryo,"Malgun Gothic","Microsoft YaHei","PingFang SC",sans-serif;
+  --font-serif:"Noto Serif JP","Hiragino Mincho ProN","Yu Mincho","Source Han Serif JP","Nanum Myeongjo","Songti SC",Georgia,"Times New Roman",serif;
+  --font-mono:ui-monospace,"Cascadia Mono",Consolas,"Courier New",monospace;
+  --shadow-float:0 6px 16px rgba(70,58,30,.16);
+  --shadow-qr:0 16px 36px rgba(70,58,30,.28),0 2px 8px rgba(70,58,30,.16);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--board-bg);color:var(--board-ink);font-family:var(--font-sans);font-size:14px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+}
+[hidden]{display:none!important}
+button{font-family:inherit}
+button:focus-visible{outline:2px solid rgba(30,98,72,.55);outline-offset:2px}
+::selection{background:rgba(30,98,72,.22)}
+
+/* ---------- board chrome ---------- */
+.board-bar{position:sticky;top:0;z-index:50;background:var(--board-bar);border-bottom:1px solid var(--board-line)}
+.bar-inner{max-width:1240px;margin:0 auto;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.bar-title{font-size:13px;color:var(--dim)}
+.bar-title strong{color:var(--board-ink);font-weight:700}
+.bar-sub{display:block;font-size:11px;color:var(--faint);margin-top:1px}
+.bar-chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:4px 11px;border:1px dashed #C4BFCE;border-radius:999px;font-size:11px;color:#5D5868;white-space:nowrap}
+.chip b{color:var(--brand-deep);font-weight:700}
+.chip em{font-style:normal;color:var(--faint)}
+.chip.answered{border-style:solid;border-color:rgba(16,180,120,.45);color:#076B49}
+.chip.answered b{color:#076B49}
+.board{max-width:1240px;margin:0 auto;padding:26px 24px 48px}
+.view{margin-top:38px}
+.view-head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin-bottom:12px;flex-wrap:wrap}
+.kicker{margin:0 0 2px;font-family:var(--font-mono);font-size:11px;color:var(--faint)}
+.view-info h2{margin:0;font-size:20px;font-weight:700;color:var(--board-ink);letter-spacing:-.01em}
+.view-note{margin:4px 0 0;font-size:12px;color:var(--dim);max-width:700px}
+.primary-tag{display:inline-block;margin-left:8px;padding:2px 9px;border-radius:999px;background:var(--brand-soft);border:1px solid var(--brand-line);color:var(--brand-deep);font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase}
+.view-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ctl-label{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--faint);font-weight:700}
+.seg{display:inline-flex;gap:2px;padding:3px;background:#F7F6F9;border:1px solid #DAD7E1;border-radius:999px}
+.seg button{border:0;background:transparent;color:var(--dim);font-size:11px;font-weight:600;padding:5px 11px;border-radius:999px;cursor:pointer}
+.seg button:hover{color:var(--board-ink)}
+.seg button.active{background:#3B3744;color:#F6F5F8}
+.frame{border:1px solid #D3CFDC;border-radius:18px;overflow:hidden;margin:0;box-shadow:0 20px 46px rgba(45,40,60,.12);background:var(--base)}
+.frame-cap{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 14px;background:#EFEDF3;border-bottom:1px solid #DAD7E1;font-family:var(--font-mono);font-size:11px;color:#75707F}
+.cap-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tag{display:inline-block;padding:2px 9px;border-radius:999px;font-family:var(--font-sans);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;white-space:nowrap}
+.tag.answered{border:1px solid rgba(16,180,120,.5);color:#076B49;background:rgba(16,180,120,.08)}
+.row{display:grid;grid-template-columns:minmax(0,1fr) 424px;gap:38px;align-items:start;margin-top:38px}
+.row .view{margin-top:0}
+@media (max-width:1080px){.row{grid-template-columns:1fr}}
+.board-foot{margin-top:46px;padding-top:16px;border-top:1px solid var(--board-line);font-size:11px;color:var(--faint);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.board-foot code{font-family:var(--font-mono);color:var(--dim)}
+/* ---------- app screens (palette C — deep evergreen + warm sand) ---------- */
+.screen{position:relative;overflow:hidden;background:var(--base);color:var(--text);font-size:15px}
+.wash{position:absolute;inset:0;pointer-events:none;background:radial-gradient(680px 360px at 50% 0%,var(--tint),transparent 70%)}
+
+/* status pills — semantic, floating (the only shadows besides the QR card);
+   state colours outrank the brand: LIVE stays brighter than evergreen + pulsing */
+.pill{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;border:1px solid transparent}
+.pill .dot{width:8px;height:8px;border-radius:50%}
+.pill.live{background:var(--emerald-bg);border-color:var(--emerald-line);color:var(--emerald-text)}
+.pill.live .dot{background:var(--emerald);animation:pulse 2s cubic-bezier(.4,0,.6,1) infinite}
+.pill.paused{background:var(--amber-bg);border-color:var(--amber-line);color:var(--amber-text)}
+.pill.paused .dot{background:var(--amber)}
+.pill.stopped{background:var(--rose-bg);border-color:var(--rose-line);color:var(--rose-text)}
+.pill.stopped .dot{background:var(--rose)}
+.pill.waiting{background:rgba(120,110,85,.08);border-color:rgba(120,110,85,.22);color:#8A8270}
+.pill.waiting .dot{background:var(--grey-dot)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes breathe{
+  0%,100%{background-color:rgba(30,98,72,.05);border-left-color:rgba(30,98,72,.30)}
+  50%{background-color:rgba(30,98,72,.12);border-left-color:rgba(30,98,72,.62)}
+}
+@media (prefers-reduced-motion:reduce){.pill.live .dot,.cursor,.line.interim{animation:none}}
+
+/* ---------- 01 listener (q4/q6 = B: same two panels, chrome + reading polish) ---------- */
+.listener-app{height:700px;display:flex;flex-direction:column;gap:14px;padding:24px}
+/* quieter header: card chrome removed — a slim bar with a hairline base */
+.l-head{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:2px 4px 14px;background:transparent;border:0;border-bottom:1px solid var(--line-soft);border-radius:0}
+.l-title{margin:0;font-size:16px;font-weight:700;color:var(--ink-900);letter-spacing:.01em}
+.l-actions{display:flex;align-items:center;gap:8px}
+.l-actions .pill{box-shadow:var(--shadow-float)}
+.audio-btn{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:999px;border:1px solid var(--line);background:var(--raise);color:var(--text-dim);font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+.audio-btn .ic{width:14px;height:14px;flex:none}
+.audio-btn.on{background:var(--brand-wash);border-color:var(--brand-line);color:var(--brand-deep)}
+.audio-btn:not(:disabled):hover{background:#F6F1E2}
+.audio-btn.on:not(:disabled):hover{background:rgba(30,98,72,.22)}
+.audio-btn:disabled{opacity:.4;cursor:not-allowed}
+.banner{border-radius:12px;padding:11px 16px;text-align:center;font-weight:700;font-size:13.5px;border:1px solid transparent}
+.banner.paused{background:var(--amber-bg);border-color:var(--amber-line);color:var(--amber-text)}
+.banner.ended{background:var(--rose-bg);border-color:var(--rose-line);color:var(--rose-text)}
+.l-panels{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;gap:18px;flex:1;min-height:0}
+@media (max-width:760px){.l-panels{grid-template-columns:1fr}}
+/* q3-A: panels are solid tone steps with 1px quiet borders — no blur, no shadow */
+.panel{display:flex;flex-direction:column;min-height:0;overflow:hidden;background:var(--panel);border:1px solid var(--line-soft);border-radius:14px}
+.panel.main{background:var(--card);border-color:var(--brand-line)}
+.panel-head{flex:none;padding:12px 22px;font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim);background:transparent;border-bottom:1px solid var(--line-soft)}
+.panel.main .panel-head{color:var(--brand-deep);background:var(--brand-soft);border-bottom-color:var(--brand-line)}
+.panel-body{flex:1;min-height:0;overflow-y:auto;padding:22px 26px;display:flex;flex-direction:column;gap:20px}
+.panel-body::-webkit-scrollbar{width:10px}
+.panel-body::-webkit-scrollbar-thumb{background:#D9CBA8;border-radius:8px;border:2px solid var(--panel)}
+.panel-body::-webkit-scrollbar-track{background:transparent}
+/* reading text, not table cells: BOTH panels flow as borderless serif sentences /
+   short paragraphs with space between them — no per-line boxes or cards (locked
+   feedback); real reading measure and larger translation type per q5-A · q6-B */
+.line{background:none;border:0;border-radius:0;padding:0;width:100%;max-width:29em;margin:0 auto;font-family:var(--font-serif);font-size:16px;line-height:1.8;color:var(--text-dim)}
+.line.trans{font-size:18.5px;line-height:1.85;color:var(--read);max-width:34em}
+/* interim = the live edge: a breathing pulse in BOTH panels; the shared rhythm is the
+   link between the current translation and its source line — the only boxed line */
+.line.interim{background-color:rgba(30,98,72,.05);border-left:3px solid rgba(30,98,72,.30);border-radius:6px;padding:10px 14px 10px 16px;color:var(--text-dim);font-style:italic;animation:breathe 2.6s ease-in-out infinite}
+.waiting-msg{display:none;margin:0;flex:1;align-items:center;justify-content:center;text-align:center;color:var(--text-dim);font-family:var(--font-serif);font-weight:500;font-size:16px}
+#listener-root[data-state="waiting"] .waiting-msg{display:flex}
+#listener-root[data-state="waiting"] .line,#listener-root[data-state="waiting"] .interim{display:none}
+#listener-root[data-state="paused"] .interim,#listener-root[data-state="stopped"] .interim{display:none}
+.cursor{display:inline-block;width:6px;height:15px;margin-left:4px;vertical-align:-2px;border-radius:2px;background:var(--brand-deep);animation:blink 1s step-end infinite}
+/* ---------- 02 operator console ---------- */
+.operator-app{height:800px}
+.op-wash{background:radial-gradient(760px 340px at 50% 0%,var(--tint),transparent 70%)}
+.op-scroll{position:absolute;inset:0;overflow-y:auto}
+.op-scroll::-webkit-scrollbar{width:10px}
+.op-scroll::-webkit-scrollbar-thumb{background:#D9CBA8;border-radius:8px;border:2px solid var(--base)}
+.op-wrap{position:relative;z-index:1;max-width:768px;margin:0 auto;padding:56px 24px 48px;min-height:100%;display:flex;flex-direction:column;justify-content:flex-start}
+.operator-app[data-auth="login"] .op-wrap{justify-content:center}
+.op-card{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:36px}
+.op-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:28px}
+.op-church{margin:0;font-family:var(--font-serif);font-size:27px;font-weight:700;color:var(--ink-900);letter-spacing:-.01em}
+.op-room{display:inline-block;margin-top:10px;padding:3px 10px;background:var(--deep);border:1px solid var(--line);border-radius:6px;font-family:var(--font-mono);font-size:13px;color:var(--text-dim)}
+.pill.op-pill{padding:11px 18px;font-size:12.5px;letter-spacing:.09em;box-shadow:var(--shadow-float)}
+.pill.op-pill .dot{width:11px;height:11px}
+.op-controls{background:var(--panel);border:1px solid var(--line-soft);border-radius:16px;padding:26px;display:flex;flex-direction:column;gap:18px}
+.feed-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.feed-btn{padding:20px 0;border:0;border-radius:16px;font-size:21px;font-weight:800;letter-spacing:.02em;color:#FFF9EC;cursor:pointer;transition:filter .15s}
+/* Start is a FEED action: bright emerald + play glyph — deliberately not the brand
+   green; state colours outrank the brand palette (locked feedback) */
+.feed-btn.start{background:linear-gradient(180deg,#14B380,#0B8A5F)}
+.feed-btn.start::before{content:"\25B6";display:inline-block;font-size:.68em;margin-right:11px;vertical-align:2px;opacity:.92}
+.feed-btn.pause{background:linear-gradient(180deg,#E0911C,#BA6E09)}
+.feed-btn.stop{background:linear-gradient(180deg,#E11D48,#BE123C)}
+.feed-btn:not(:disabled):hover{filter:brightness(1.08)}
+.feed-btn:disabled{background:var(--deep);color:var(--text-mute);cursor:not-allowed;filter:none}
+.feed-help{margin:0;text-align:center;font-size:13px;color:var(--text-dim)}
+.qr-card{margin-top:22px;display:flex;align-items:center;gap:24px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px}
+.qr-white{flex:none;background:#fff;border-radius:12px;padding:12px;box-shadow:var(--shadow-qr)}
+#qr-canvas{display:block;width:176px;height:176px}
+.qr-copy{min-width:0}
+.qr-title{margin:0 0 6px;font-family:var(--font-serif);font-size:19px;font-weight:700;color:var(--ink-900)}
+.qr-text{margin:0 0 10px;font-size:13px;line-height:1.55;color:var(--text-dim)}
+.qr-url{margin:0 0 14px;font-family:var(--font-mono);font-size:12px;color:var(--text-dim);word-break:break-all}
+.btn-download{border:1px solid var(--ink-900);background:var(--ink-900);color:var(--raise);font-size:13px;font-weight:700;padding:10px 18px;border-radius:12px;cursor:pointer;transition:filter .15s}
+.btn-download:hover{filter:brightness(1.15)}
+.op-foot{margin-top:26px;display:flex;justify-content:flex-end}
+.btn-logout{border:0;background:transparent;color:var(--text-dim);font-size:13px;font-weight:700;padding:10px 16px;border-radius:12px;cursor:pointer;transition:color .15s,background .15s}
+.btn-logout:hover{color:var(--rose-text);background:var(--rose-bg)}
+.login-card{width:100%;max-width:448px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:24px;padding:44px 40px}
+.login-head{text-align:center;margin-bottom:34px}
+.brand{margin:0;font-family:var(--font-serif);font-size:34px;font-weight:700;color:var(--brand);letter-spacing:.01em}
+.seam{width:64px;height:1px;margin:10px auto 0;background:linear-gradient(90deg,transparent,rgba(30,98,72,.85),transparent)}
+.login-sub{margin:12px 0 0;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--text-dim)}
+.field{margin-bottom:20px}
+.f-label{display:block;margin-bottom:8px;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text-dim)}
+.input{width:100%;padding:13px 15px;background:var(--raise);border:1px solid var(--line);border-radius:12px;color:var(--ink-900);font-size:16px;font-weight:500;outline:none;transition:border-color .15s,box-shadow .15s;font-family:inherit}
+.input:focus{border-color:var(--brand-line);box-shadow:0 0 0 3px rgba(30,98,72,.16)}
+.btn-primary{width:100%;margin-top:8px;padding:16px 0;border:1px solid var(--btn-border);border-radius:16px;font-size:19px;font-weight:800;letter-spacing:.02em;color:var(--btn-ink);background:var(--btn-grad);cursor:pointer;transition:filter .15s}
+.btn-primary:hover{filter:brightness(1.08)}
+.btn-primary:active{filter:brightness(.94)}
+
+/* ---------- 03 guest landing ---------- */
+.guest-app{height:800px;display:flex;align-items:center;justify-content:center;padding:20px}
+.guest-wash{background:radial-gradient(420px 460px at 50% 45%,var(--tint),transparent 72%)}
+.guest-card{position:relative;z-index:1;width:100%;max-width:390px;background:var(--card);border:1px solid var(--line);border-radius:24px;padding:36px 28px}
+.guest-brand{font-size:32px}
+.guest-church{margin:14px 0 0;text-align:center;font-family:var(--font-serif);font-size:17px;font-weight:700;color:var(--ink-900)}
+.guest-label{margin:4px 0 0;text-align:center;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--text-dim)}
+.notice{margin:20px 0 6px;padding:12px 14px;border-radius:12px;background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber-text);font-size:13px;line-height:1.5;text-align:center;font-weight:500}
+.lang-list{margin-top:18px;display:flex;flex-direction:column;gap:14px}
+.lang-btn{width:100%;padding:17px 0;border:1px solid var(--btn-border);border-radius:16px;font-size:19px;font-weight:800;letter-spacing:.02em;color:var(--btn-ink);background:var(--btn-grad);cursor:pointer;transition:filter .15s}
+.lang-btn:hover{filter:brightness(1.08)}
+.lang-btn:active{filter:brightness(.94)}
+.guest-connecting{position:relative;z-index:1;text-align:center}
+.guest-connecting .brand{font-size:34px}
+.guest-connecting .guest-label{margin-top:18px}
+</style>
+</head>
+<body>
+
+<header class="board-bar">
+  <div class="bar-inner">
+    <div class="bar-title">
+      <strong>Kizuna UI redesign — palette &amp; surfaces</strong>
+      <span class="bar-sub">grill-with-ui · prototype v4 · settled final design — q1 C · q2 C · q3 A · q4/q6 B · q5 A · no assumed regions</span>
+    </div>
+    <div class="bar-chips">
+      <span class="chip answered" title="Answered C — light-first, deep and colourful; no white page anywhere. Every screen is drawn on a pigmented sand base."><b>q1</b> ✓ C — light-first <em>(no white pages)</em></span>
+      <span class="chip answered" title="Answered C — deep evergreen + warm sand: sand-toned base, deep evergreen accents, warm neutrals."><b>q2</b> ✓ C — evergreen + sand</span>
+      <span class="chip answered" title="Answered A — solid layered surfaces: cards a solid tone step up from the base, 1px quiet borders, shadow only for genuinely floating elements."><b>q3</b> ✓ A — solid layered</span>
+      <span class="chip answered" title="Answered B — reskin plus light structural tuning: the two-panel structures stay exactly as they are; chrome and reading polish applied."><b>q4·q6</b> ✓ B — chrome + reading polish</span>
+      <span class="chip answered" title="Answered A — serif reading text, sans chrome; Noto Serif JP / Noto Sans JP named in the stacks (system stand-ins render in this offline frame)."><b>q5</b> ✓ A — serif reading type</span>
+    </div>
+  </div>
+</header>
+
+<main class="board">
+  <!-- ============ 01 · LISTENER (primary screen) ============ -->
+  <section class="view">
+    <div class="view-head">
+      <div class="view-info">
+        <p class="kicker">01 · /listen/1/en<span class="primary-tag">primary screen</span></p>
+        <h2>Listener</h2>
+        <p class="view-note">The screen guests hold in the pew — translation panel beside the Japanese transcript (phones stack the translation above it), live feed pill, Audio ON/OFF. Settled design: deep evergreen + warm sand (q2 C) on solid layered surfaces (q3 A). Reading polish per q4/q6 B: quieter header, a real reading measure, the interim line as a breathing pulse shared by both panels. Both panels read as flowing text — borderless serif sentences with space between them, no per-line boxes; serif reading lines, sans chrome (q5 A). The LIVE pill stays feed-emerald with its pulsing dot — state colours outrank the brand.</p>
+      </div>
+      <div class="view-controls">
+        <span class="ctl-label">feed state</span>
+        <div class="seg" id="listener-seg">
+          <button type="button" data-v="waiting">Waiting</button>
+          <button type="button" data-v="live" class="active">Live</button>
+          <button type="button" data-v="paused">Paused</button>
+          <button type="button" data-v="stopped">Ended</button>
+        </div>
+      </div>
+    </div>
+    <figure class="frame">
+      <figcaption class="frame-cap">
+        <span>kizuna · /listen/1/en</span>
+        <span class="cap-status">
+          <span class="tag answered">q1 ✓ C</span>
+          <span class="tag answered">q2 ✓ C — evergreen + sand</span>
+          <span class="tag answered">q3 ✓ A — solid surfaces</span>
+          <span class="tag answered">q4·q6 ✓ B — reading polish</span>
+          <span class="tag answered">q5 ✓ A — serif reading</span>
+        </span>
+      </figcaption>
+      <div class="screen listener-app" id="listener-root" data-state="live">
+        <div class="wash"></div>
+
+        <div class="l-head">
+          <h2 class="l-title">Live Translation</h2>
+          <div class="l-actions">
+            <span class="pill live" id="listener-pill" role="status" aria-live="polite">
+              <span class="dot"></span><span id="listener-pill-label">Live</span>
+            </span>
+            <button class="audio-btn on" id="audio-btn" type="button" aria-pressed="true">
+              <svg class="ic ic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15.536 8.464a5 5 0 010 7.072M17.657 6.343a8 8 0 010 11.314M5 10v4a2 2 0 002 2h2.586l3.707 3.707a1 1 0 001.707-.707V5a1 1 0 00-1.707-.707L9.586 10H7a2 2 0 00-2 2z"/></svg>
+              <svg class="ic ic-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/><path d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/></svg>
+              <span id="audio-label">Audio: ON</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="banner" id="listener-banner" hidden></div>
+
+        <div class="l-panels">
+          <div class="panel">
+            <div class="panel-head">日本語 (Transcript)</div>
+            <div class="panel-body" id="ja-body">
+              <div class="line">おはようございます。今日も皆さんと一緒に礼拝できることを感謝します。</div>
+              <div class="line">今日の聖書箇所は、ヨハネによる福音書の十五章です。</div>
+              <div class="line">イエスは言われました。「わたしはぶどうの木、あなたがたはその枝である。」</div>
+              <div class="line">枝が木につながっていなければ、実を結ぶことができません。</div>
+              <div class="line">神を愛し、隣人を愛すること。それが私たちの歩みの中心です。</div>
+              <div class="line">この絆は、言葉や国を超えて、私たちを一つにします。</div>
+              <div class="line interim">そして今日、私たちは…<span class="cursor"></span></div>
+            </div>
+          </div>
+          <div class="panel main">
+            <div class="panel-head">EN (Translation)</div>
+            <div class="panel-body" id="en-body">
+              <p class="waiting-msg">Waiting for operator to start the feed…</p>
+              <div class="line trans">Good morning. I'm grateful we can worship together again today.</div>
+              <div class="line trans">Today's Scripture passage is John, chapter fifteen.</div>
+              <div class="line trans">Jesus said, "I am the vine; you are the branches."</div>
+              <div class="line trans">A branch cannot bear fruit unless it remains connected to the vine.</div>
+              <div class="line trans">To love God and to love our neighbor — that is the center of our walk.</div>
+              <div class="line trans">This bond, 絆, crosses languages and nations and makes us one.</div>
+              <div class="line trans interim">And today, we are going to…<span class="cursor"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </figure>
+  </section>
+
+  <div class="row">
+    <!-- ============ 02 · OPERATOR CONSOLE ============ -->
+    <section class="view">
+      <div class="view-head">
+        <div class="view-info">
+          <p class="kicker">02 · /operate</p>
+          <h2>Operator console</h2>
+          <p class="view-note">Laptop, in the room where the sermon is spoken — login card or the live console with Start/Pause/Stop feed controls, the feed status pill, and the guest QR card (kept white: scanners and printers need a light quiet zone). Start stays feed-emerald with a play glyph so it reads as a feed action — state colours outrank the brand; the evergreen brand appears only on identity and the login action.</p>
+        </div>
+        <div class="view-controls">
+          <span class="ctl-label">screen</span>
+          <div class="seg" id="op-auth-seg">
+            <button type="button" data-v="console" class="active">Console</button>
+            <button type="button" data-v="login">Login card</button>
+          </div>
+          <span class="ctl-label">feed</span>
+          <div class="seg" id="op-state-seg">
+            <button type="button" data-v="stopped">Stopped</button>
+            <button type="button" data-v="live" class="active">Live</button>
+            <button type="button" data-v="paused">Paused</button>
+          </div>
+        </div>
+      </div>
+      <figure class="frame">
+        <figcaption class="frame-cap">
+          <span>kizuna · /operate</span>
+          <span class="cap-status">
+            <span class="tag answered">q1 ✓ C</span>
+            <span class="tag answered">q2 ✓ C</span>
+            <span class="tag answered">q3 ✓ A</span>
+          </span>
+        </figcaption>
+        <div class="screen operator-app" id="operator-root" data-auth="console" data-state="live">
+          <div class="wash op-wash"></div>
+          <div class="op-scroll">
+            <div class="op-wrap">
+
+              <div class="op-console" id="op-console">
+                <div class="op-card">
+                  <div class="op-head">
+                    <div>
+                      <h1 class="op-church">Osaka Grace Church</h1>
+                      <span class="op-room">Room #1</span>
+                    </div>
+                    <div class="pill op-pill live" id="op-pill" role="status" aria-live="polite">
+                      <span class="dot"></span><span id="op-pill-label">Live</span>
+                    </div>
+                  </div>
+
+                  <div class="op-controls">
+                    <div class="feed-grid">
+                      <button class="feed-btn start" id="btn-start" type="button" disabled>Start</button>
+                      <button class="feed-btn pause" id="btn-pause" type="button">Pause</button>
+                      <button class="feed-btn stop" id="btn-stop" type="button">Stop</button>
+                    </div>
+                    <p class="feed-help" id="feed-help">Streaming the mixer feed. Translations are live.</p>
+                  </div>
+
+                  <div class="qr-card">
+                    <div class="qr-white">
+                      <canvas id="qr-canvas" width="352" height="352" aria-label="Guest QR code"></canvas>
+                    </div>
+                    <div class="qr-copy">
+                      <h2 class="qr-title">Guest QR</h2>
+                      <p class="qr-text">Print this code and place it where guests can scan it. It is permanent for this church — the same QR keeps working when the operator password changes.</p>
+                      <p class="qr-url">kizuna.church/?qr=osaka-grace-8f3a2c</p>
+                      <button class="btn-download" id="btn-download" type="button">Download QR</button>
+                    </div>
+                  </div>
+
+                  <div class="op-foot">
+                    <button class="btn-logout" id="btn-logout" type="button">Log out</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="op-login" id="op-login" hidden>
+                <form class="login-card" id="login-form" aria-label="Operator login">
+                  <div class="login-head">
+                    <h1 class="brand">絆 KIZUNA</h1>
+                    <div class="seam"></div>
+                    <p class="login-sub">Operator Console</p>
+                  </div>
+                  <div class="field">
+                    <label class="f-label" for="operator-email">Email</label>
+                    <input class="input" id="operator-email" type="email" autocomplete="username">
+                  </div>
+                  <div class="field">
+                    <label class="f-label" for="operator-password">Password</label>
+                    <input class="input" id="operator-password" type="password" autocomplete="current-password">
+                  </div>
+                  <button class="btn-primary" type="submit">Log in</button>
+                </form>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </figure>
+    </section>
+
+    <!-- ============ 03 · GUEST LANDING ============ -->
+    <section class="view">
+      <div class="view-head">
+        <div class="view-info">
+          <p class="kicker">03 · /?qr=…</p>
+          <h2>Guest landing</h2>
+          <p class="view-note">Phone, right after scanning the pew QR — church name, language choice and the not-started notice. The language buttons are the guest's one primary action, so they carry the evergreen brand fill on the sand base.</p>
+        </div>
+        <div class="view-controls">
+          <span class="ctl-label">state</span>
+          <div class="seg" id="guest-seg">
+            <button type="button" data-v="notstarted" class="active">Not started</button>
+            <button type="button" data-v="live">Live</button>
+            <button type="button" data-v="connecting">Connecting</button>
+          </div>
+        </div>
+      </div>
+      <figure class="frame">
+        <figcaption class="frame-cap">
+          <span>kizuna · /?qr=osaka-grace-8f3a2c</span>
+          <span class="cap-status">
+            <span class="tag answered">q1 ✓ C</span>
+            <span class="tag answered">q2 ✓ C</span>
+            <span class="tag answered">q3 ✓ A</span>
+          </span>
+        </figcaption>
+        <div class="screen guest-app" id="guest-root" data-state="notstarted">
+          <div class="wash guest-wash"></div>
+
+          <div class="guest-card" id="guest-card">
+            <h1 class="brand guest-brand">絆 KIZUNA</h1>
+            <div class="seam"></div>
+            <p class="guest-church">Osaka Grace Church</p>
+            <p class="guest-label">Choose your language</p>
+            <p class="notice" id="guest-notice">The service hasn't started yet — pick a language now and you'll wait on the next screen until the operator begins.</p>
+            <div class="lang-list">
+              <button class="lang-btn" type="button">English</button>
+              <button class="lang-btn" type="button">한국어 (Korean)</button>
+              <button class="lang-btn" type="button">中文 (Chinese)</button>
+            </div>
+          </div>
+
+          <div class="guest-connecting" id="guest-connecting" hidden>
+            <h1 class="brand">絆 KIZUNA</h1>
+            <p class="guest-label">Connecting to your church…</p>
+          </div>
+        </div>
+      </figure>
+    </section>
+
+  </div>
+
+  <footer class="board-foot">
+    <span>All six questions settled — this is the exportable design. Evergreen = brand: brand mark, links, focus and primary actions (Log in, the language buttons). State colours outrank the brand: the LIVE pill keeps the brighter feed-emerald tone + pulsing dot and the operator's Start stays feed-emerald with a play glyph — never brand. Both listener panels flow as borderless serif text, sentences with space between them — only the interim live-edge line keeps its breathing pulse. QR card stays white by design (scanner quiet zone); every other base is a pigmented sand, never #fff. No backdrop-blur: surface depth is tone steps + 1px borders (q3 A); shadows only on floating pills and the QR card.</span>
+    <span>routes <code>/</code> · <code>/listen/1/en</code> · <code>/operate</code></span>
+  </footer>
+
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  /* small segmented-control helper; returns an activate(value) fn */
+  function seg(root, onPick) {
+    var buttons = root.querySelectorAll('button');
+    function activate(value) {
+      for (var i = 0; i < buttons.length; i++) {
+        buttons[i].classList.toggle('active', buttons[i].dataset.v === value);
+      }
+    }
+    root.addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b || !root.contains(b)) return;
+      activate(b.dataset.v);
+      onPick(b.dataset.v);
+    });
+    var initial = root.querySelector('button.active');
+    if (initial) activate(initial.dataset.v);
+    return activate;
+  }
+
+  /* ---------- 01 listener ---------- */
+  var LISTENER = {
+    waiting: { label: 'Waiting', pill: 'waiting', banner: null, bannerCls: '', available: false, kill: false },
+    live:    { label: 'Live',    pill: 'live',    banner: null, bannerCls: '', available: true,  kill: false },
+    paused:  { label: 'Paused',  pill: 'paused',  banner: 'Paused — worship music', bannerCls: 'paused', available: true, kill: false },
+    stopped: { label: 'Ended',   pill: 'stopped', banner: 'Service ended', bannerCls: 'ended', available: false, kill: true }
+  };
+  var listenerRoot = document.getElementById('listener-root');
+  var listenerPill = document.getElementById('listener-pill');
+  var listenerPillLabel = document.getElementById('listener-pill-label');
+  var listenerBanner = document.getElementById('listener-banner');
+  var audioBtn = document.getElementById('audio-btn');
+  var audioLabel = document.getElementById('audio-label');
+  var audioOn = true;
+
+  function renderAudio(available) {
+    audioBtn.disabled = !available;
+    audioBtn.classList.toggle('on', audioOn && available);
+    audioLabel.textContent = audioOn ? 'Audio: ON' : 'Audio: OFF';
+    audioBtn.setAttribute('aria-pressed', String(audioOn));
+    audioBtn.querySelector('.ic-on').style.display = audioOn ? '' : 'none';
+    audioBtn.querySelector('.ic-off').style.display = audioOn ? 'none' : '';
+  }
+
+  function setListener(state) {
+    var s = LISTENER[state];
+    listenerRoot.dataset.state = state;
+    listenerPill.className = 'pill ' + s.pill;
+    listenerPillLabel.textContent = s.label;
+    if (s.banner) {
+      listenerBanner.hidden = false;
+      listenerBanner.className = 'banner ' + s.bannerCls;
+      listenerBanner.textContent = s.banner;
+    } else {
+      listenerBanner.hidden = true;
+    }
+    if (s.kill) audioOn = false;
+    renderAudio(s.available);
+    requestAnimationFrame(function () {
+      ['ja-body', 'en-body'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.scrollTop = el.scrollHeight;
+      });
+    });
+  }
+
+  seg(document.getElementById('listener-seg'), setListener);
+  audioBtn.addEventListener('click', function () {
+    if (audioBtn.disabled) return;
+    audioOn = !audioOn;
+    renderAudio(LISTENER[listenerRoot.dataset.state].available);
+  });
+
+  /* ---------- 02 operator console ---------- */
+  var OP = {
+    stopped: { label: 'Stopped', pill: 'stopped', help: 'Press Start when the sermon begins.' },
+    live:    { label: 'Live',    pill: 'live',    help: 'Streaming the mixer feed. Translations are live.' },
+    paused:  { label: 'Paused',  pill: 'paused',  help: 'Feed paused. Guests see the Paused banner.' }
+  };
+  var operatorRoot = document.getElementById('operator-root');
+  var opPill = document.getElementById('op-pill');
+  var opPillLabel = document.getElementById('op-pill-label');
+  var btnStart = document.getElementById('btn-start');
+  var btnPause = document.getElementById('btn-pause');
+  var btnStop = document.getElementById('btn-stop');
+  var feedHelp = document.getElementById('feed-help');
+  var activateOpState;
+
+  function setOperator(state) {
+    var s = OP[state];
+    operatorRoot.dataset.state = state;
+    opPill.className = 'pill op-pill ' + s.pill;
+    opPillLabel.textContent = s.label;
+    feedHelp.textContent = s.help;
+    btnStart.disabled = state === 'live';
+    btnStart.textContent = state === 'paused' ? 'Resume' : 'Start';
+    btnPause.disabled = state !== 'live';
+    btnStop.disabled = state === 'stopped';
+  }
+
+  activateOpState = seg(document.getElementById('op-state-seg'), setOperator);
+  btnStart.addEventListener('click', function () { if (btnStart.disabled) return; setOperator('live'); activateOpState('live'); });
+  btnPause.addEventListener('click', function () { if (btnPause.disabled) return; setOperator('paused'); activateOpState('paused'); });
+  btnStop.addEventListener('click', function () { if (btnStop.disabled) return; setOperator('stopped'); activateOpState('stopped'); });
+
+  var activateOpAuth;
+  function setAuth(mode) {
+    operatorRoot.dataset.auth = mode;
+    document.getElementById('op-console').hidden = mode !== 'console';
+    document.getElementById('op-login').hidden = mode !== 'login';
+  }
+  activateOpAuth = seg(document.getElementById('op-auth-seg'), setAuth);
+  document.getElementById('btn-logout').addEventListener('click', function () { setAuth('login'); activateOpAuth('login'); });
+  document.getElementById('login-form').addEventListener('submit', function (e) { e.preventDefault(); setAuth('console'); activateOpAuth('console'); });
+
+  /* QR: deterministic decorative pattern, rendered offline on a canvas.
+     White quiet zone is intentional — the QR card is the one light-print region. */
+  (function drawQr() {
+    var canvas = document.getElementById('qr-canvas');
+    var ctx = canvas.getContext('2d');
+    var size = canvas.width, n = 25, quiet = 4, total = n + quiet * 2;
+    var mod = Math.floor(size / total), off = Math.floor((size - mod * total) / 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+    function dark(x, y) {
+      ctx.fillStyle = '#241E14';
+      ctx.fillRect(off + (quiet + x) * mod, off + (quiet + y) * mod, mod, mod);
+    }
+    function finder(fx, fy) {
+      for (var y = 0; y < 7; y++) for (var x = 0; x < 7; x++) {
+        var ring = x === 0 || x === 6 || y === 0 || y === 6;
+        var core = x >= 2 && x <= 4 && y >= 2 && y <= 4;
+        if (ring || core) dark(fx + x, fy + y);
+      }
+    }
+    finder(0, 0); finder(n - 7, 0); finder(0, n - 7);
+    for (var i = 8; i < n - 8; i += 2) { dark(i, 6); dark(6, i); }
+    for (var yy = 16; yy <= 20; yy++) for (var xx = 16; xx <= 20; xx++) {
+      var ring2 = xx === 16 || xx === 20 || yy === 16 || yy === 20;
+      if (ring2 || (xx === 18 && yy === 18)) dark(xx, yy);
+    }
+    function reserved(x, y) {
+      if (x < 8 && y < 8) return true;
+      if (x >= n - 8 && y < 8) return true;
+      if (x < 8 && y >= n - 8) return true;
+      if (x === 6 || y === 6) return true;
+      if (x >= 15 && x <= 21 && y >= 15 && y <= 21) return true;
+      return false;
+    }
+    var s = 1337;
+    function rnd() { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; }
+    for (var my = 0; my < n; my++) for (var mx = 0; mx < n; mx++) {
+      if (reserved(mx, my)) continue;
+      if (rnd() < 0.46) dark(mx, my);
+    }
+  })();
+
+  document.getElementById('btn-download').addEventListener('click', function () {
+    var btn = this;
+    try {
+      var a = document.createElement('a');
+      a.href = document.getElementById('qr-canvas').toDataURL('image/png');
+      a.download = 'kizuna-osaka-grace-church-qr.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) { /* sandbox may block downloads */ }
+    var old = btn.textContent;
+    btn.textContent = 'Downloaded';
+    setTimeout(function () { btn.textContent = old; }, 1500);
+  });
+
+  /* ---------- 03 guest landing ---------- */
+  var guestRoot = document.getElementById('guest-root');
+  function setGuest(state) {
+    guestRoot.dataset.state = state;
+    document.getElementById('guest-card').hidden = state === 'connecting';
+    document.getElementById('guest-connecting').hidden = state !== 'connecting';
+    document.getElementById('guest-notice').hidden = state !== 'notstarted';
+  }
+  seg(document.getElementById('guest-seg'), setGuest);
+
+  /* initial render (matches the app defaults drawn above) */
+  setListener('live');
+  setOperator('live');
+  setAuth('console');
+  setGuest('notstarted');
+})();
+</script>
+</body>
+</html>
