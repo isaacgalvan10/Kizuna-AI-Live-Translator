@@ -1,9 +1,104 @@
 @import "tailwindcss";
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
-/* Keep our custom blinking cursor animation */
+/*
+ * Kizuna theme — palette C: deep evergreen + warm sand.
+ * Values are authoritative in docs/ui-redesign-design.md and the settled
+ * prototype docs/ui-redesign-visual.html; keep all three in sync.
+ */
+@theme {
+  /* Sand surface steps: page base up to raised controls */
+  --color-sand-base: #F0E7D0;
+  --color-sand-deep: #E7DCC0;
+  --color-sand-panel: #F3ECD9;
+  --color-sand-card: #F7F1E0;
+  --color-sand-raise: #FBF6EA;
+  --color-sand-hover: #F6F1E2;
+  --color-sand-thumb: #D9CBA8;
+
+  /* Borders */
+  --color-line: #DCCEAE;
+  --color-line-soft: #E7DCC2;
+
+  /* Text hierarchy */
+  --color-ink: #1E3B2C;
+  --color-body: #4C4A36;
+  --color-dim: #6E6B52;
+  --color-mute: #8C8869;
+  --color-read: #3E3A28;
+
+  /* Brand evergreen */
+  --color-brand: #1E6248;
+  --color-brand-deep: #174D39;
+  --color-brand-ink: #F2EDDC;
+  --color-brand-soft: rgba(30, 98, 72, 0.08);
+  --color-brand-wash: rgba(30, 98, 72, 0.15);
+  --color-brand-line: rgba(30, 98, 72, 0.36);
+  --color-brand-tint: rgba(30, 98, 72, 0.1);
+
+  /* Primary action button: bg-linear-to-b from-btn to-btn-deep */
+  --color-btn: #257357;
+  --color-btn-deep: #1B5A43;
+  --color-btn-border: #174D39;
+  --color-btn-ink: #F2EDDC;
+
+  /* Feed states. State colours outrank the brand; each family is
+     ink (text), soft (translucent fill), line (translucent border) and a
+     solid base for dots and state buttons. */
+  --color-live: #10B981;
+  --color-live-ink: #07714B;
+  --color-live-soft: rgba(16, 180, 120, 0.15);
+  --color-live-line: rgba(10, 160, 105, 0.42);
+  --color-live-btn: #14B380;
+  --color-live-btn-deep: #0B8A5F;
+
+  --color-paused: #D9880A;
+  --color-paused-ink: #8A5A06;
+  --color-paused-soft: rgba(217, 136, 10, 0.14);
+  --color-paused-line: rgba(217, 136, 10, 0.38);
+  --color-paused-btn: #E0911C;
+  --color-paused-btn-deep: #BA6E09;
+
+  --color-danger: #E0486B;
+  --color-danger-ink: #A32C4C;
+  --color-danger-soft: rgba(225, 29, 72, 0.11);
+  --color-danger-line: rgba(225, 29, 72, 0.32);
+  --color-danger-btn: #E11D48;
+  --color-danger-btn-deep: #BE123C;
+
+  --color-stopped: #9A9078;
+  --color-stopped-ink: #7A7260;
+  --color-stopped-soft: rgba(120, 110, 85, 0.1);
+  --color-stopped-line: rgba(120, 110, 85, 0.26);
+
+  /* Shadows — only for genuinely floating elements */
+  --shadow-float: 0 6px 16px rgba(70, 58, 30, 0.16);
+  --shadow-qr: 0 16px 36px rgba(70, 58, 30, 0.28), 0 2px 8px rgba(70, 58, 30, 0.16);
+
+  /* Type: sans chrome, serif reading, CJK-safe fallbacks */
+  --font-sans: "Noto Sans JP", ui-sans-serif, system-ui, "Segoe UI", "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic UI", Meiryo, "Malgun Gothic", "Microsoft YaHei", "PingFang SC", sans-serif;
+  --font-serif: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", "Source Han Serif JP", "Nanum Myeongjo", "Songti SC", Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    background-color: var(--color-sand-base);
+    color: var(--color-body);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--color-brand-wash);
+  }
+}
+
 .blinking-cursor {
   animation: blink 1s step-end infinite;
 }
@@ -11,116 +106,4 @@
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
-}
-
-:root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
-
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
-
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-}
-
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
 }

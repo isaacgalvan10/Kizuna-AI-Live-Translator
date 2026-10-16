@@ -19,6 +19,10 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    // The theme suite imports the global stylesheet with ?raw to verify the
+    // @theme token block; Vitest's default css: false blanks CSS imports
+    // (including ?raw ones), so let this single file through untouched.
+    css: { include: [/index\.css\?raw$/] },
     // Tests derive WebSocket URLs from window.location, so pin the jsdom URL to
     // what the dev server actually serves on.
     environmentOptions: { jsdom: { url: 'http://localhost:5173' } },
