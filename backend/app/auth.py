@@ -49,16 +49,31 @@ def _unauthorized() -> HTTPException:
     )
 
 
+def operator_claims_from_token(token: str | None) -> dict | None:
+    """Decodes an operator JWT, returning its claims or None when unusable.
+
+    Used where raising an HTTPException is not an option — notably the WebSocket
+    handshake, where browsers cannot send an Authorization header and the token
+    arrives as a query parameter instead.
+    """
+    if not token:
+        return None
+    try:
+        claims = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.InvalidTokenError:
+        return None
+    if "church_id" not in claims:
+        return None
+    return claims
+
+
 async def get_operator_claims(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> dict:
-    if credentials is None:
-        raise _unauthorized()
-    try:
-        claims = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-    except jwt.InvalidTokenError:
-        raise _unauthorized()
-    if "church_id" not in claims:
+    claims = operator_claims_from_token(
+        credentials.credentials if credentials is not None else None
+    )
+    if claims is None:
         raise _unauthorized()
     return claims
 

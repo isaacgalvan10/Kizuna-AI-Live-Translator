@@ -71,14 +71,6 @@ async def other_church_operator(client, db_session):
     }
 
 
-async def auth_headers(client, operator_setup):
-    response = await client.post(
-        "/api/operator/login",
-        json={"email": operator_setup["operator"].email, "password": operator_setup["password"]},
-    )
-    return {"Authorization": f"Bearer {response.json()['access_token']}"}
-
-
 @pytest.mark.parametrize("action", ["start", "pause", "stop"])
 async def test_feed_control_requires_operator_token(client, room, action):
     response = await client.post(f"/api/operator/rooms/{room.id}/{action}")
@@ -86,8 +78,8 @@ async def test_feed_control_requires_operator_token(client, room, action):
     assert response.status_code == 401
 
 
-async def test_start_marks_the_room_live(client, room, operator_setup, db_session):
-    headers = await auth_headers(client, operator_setup)
+async def test_start_marks_the_room_live(client, room, auth_headers, db_session):
+    headers = await auth_headers()
 
     response = await client.post(f"/api/operator/rooms/{room.id}/start", headers=headers)
 
@@ -98,8 +90,8 @@ async def test_start_marks_the_room_live(client, room, operator_setup, db_sessio
     assert room.is_live is True
 
 
-async def test_start_rejects_unknown_room(client, operator_setup):
-    headers = await auth_headers(client, operator_setup)
+async def test_start_rejects_unknown_room(client, auth_headers):
+    headers = await auth_headers()
 
     response = await client.post("/api/operator/rooms/9999/start", headers=headers)
 
@@ -120,8 +112,8 @@ async def test_operator_cannot_control_another_churchs_room(
     assert room.is_live is False
 
 
-async def test_start_is_idempotent_when_room_already_live(client, room, operator_setup, db_session):
-    headers = await auth_headers(client, operator_setup)
+async def test_start_is_idempotent_when_room_already_live(client, room, auth_headers, db_session):
+    headers = await auth_headers()
 
     first = await client.post(f"/api/operator/rooms/{room.id}/start", headers=headers)
     second = await client.post(f"/api/operator/rooms/{room.id}/start", headers=headers)
@@ -134,13 +126,13 @@ async def test_start_is_idempotent_when_room_already_live(client, room, operator
     assert room.is_live is True
 
 
-async def test_start_broadcasts_live_to_every_language_channel(client, room, operator_setup):
+async def test_start_broadcasts_live_to_every_language_channel(client, room, auth_headers):
     english_listener = FakeWebSocket()
     korean_listener = FakeWebSocket()
     await manager.connect(english_listener, str(room.id), "en")
     await manager.connect(korean_listener, str(room.id), "ko")
 
-    headers = await auth_headers(client, operator_setup)
+    headers = await auth_headers()
     await client.post(f"/api/operator/rooms/{room.id}/start", headers=headers)
 
     assert sent_feed_states(english_listener) == ["live"]
@@ -148,7 +140,7 @@ async def test_start_broadcasts_live_to_every_language_channel(client, room, ope
 
 
 async def test_feed_state_broadcast_does_not_reach_other_rooms(
-    client, room, operator_setup, db_session
+    client, room, auth_headers, operator_setup, db_session
 ):
     other_room = Room(church_id=operator_setup["church"].id, is_live=False)
     db_session.add(other_room)
@@ -158,14 +150,14 @@ async def test_feed_state_broadcast_does_not_reach_other_rooms(
     bystander = FakeWebSocket()
     await manager.connect(bystander, str(other_room.id), "en")
 
-    headers = await auth_headers(client, operator_setup)
+    headers = await auth_headers()
     await client.post(f"/api/operator/rooms/{room.id}/start", headers=headers)
 
     assert sent_feed_states(bystander) == []
 
 
-async def test_start_succeeds_with_no_listeners_connected(client, room, operator_setup):
-    headers = await auth_headers(client, operator_setup)
+async def test_start_succeeds_with_no_listeners_connected(client, room, auth_headers):
+    headers = await auth_headers()
 
     response = await client.post(f"/api/operator/rooms/{room.id}/start", headers=headers)
 
@@ -173,9 +165,9 @@ async def test_start_succeeds_with_no_listeners_connected(client, room, operator
 
 
 async def test_pause_reports_paused_and_keeps_room_findable(
-    client, room, operator_setup, db_session
+    client, room, auth_headers, db_session
 ):
-    headers = await auth_headers(client, operator_setup)
+    headers = await auth_headers()
     await client.post(f"/api/operator/rooms/{room.id}/start", headers=headers)
 
     response = await client.post(f"/api/operator/rooms/{room.id}/pause", headers=headers)
@@ -187,8 +179,8 @@ async def test_pause_reports_paused_and_keeps_room_findable(
     assert room.is_live is True
 
 
-async def test_pause_broadcasts_paused_to_listeners(client, room, operator_setup):
-    headers = await auth_headers(client, operator_setup)
+async def test_pause_broadcasts_paused_to_listeners(client, room, auth_headers):
+    headers = await auth_headers()
     await client.post(f"/api/operator/rooms/{room.id}/start", headers=headers)
 
     listener = FakeWebSocket()
@@ -199,8 +191,8 @@ async def test_pause_broadcasts_paused_to_listeners(client, room, operator_setup
     assert sent_feed_states(listener) == ["paused"]
 
 
-async def test_start_after_pause_resumes_the_feed(client, room, operator_setup):
-    headers = await auth_headers(client, operator_setup)
+async def test_start_after_pause_resumes_the_feed(client, room, auth_headers):
+    headers = await auth_headers()
     await client.post(f"/api/operator/rooms/{room.id}/start", headers=headers)
     await client.post(f"/api/operator/rooms/{room.id}/pause", headers=headers)
 
@@ -214,8 +206,8 @@ async def test_start_after_pause_resumes_the_feed(client, room, operator_setup):
     assert sent_feed_states(listener) == ["live"]
 
 
-async def test_stop_marks_the_room_not_live(client, room, operator_setup, db_session):
-    headers = await auth_headers(client, operator_setup)
+async def test_stop_marks_the_room_not_live(client, room, auth_headers, db_session):
+    headers = await auth_headers()
     await client.post(f"/api/operator/rooms/{room.id}/start", headers=headers)
 
     response = await client.post(f"/api/operator/rooms/{room.id}/stop", headers=headers)
@@ -227,8 +219,8 @@ async def test_stop_marks_the_room_not_live(client, room, operator_setup, db_ses
     assert room.is_live is False
 
 
-async def test_stop_broadcasts_stopped_to_listeners(client, room, operator_setup):
-    headers = await auth_headers(client, operator_setup)
+async def test_stop_broadcasts_stopped_to_listeners(client, room, auth_headers):
+    headers = await auth_headers()
     await client.post(f"/api/operator/rooms/{room.id}/start", headers=headers)
 
     listener = FakeWebSocket()

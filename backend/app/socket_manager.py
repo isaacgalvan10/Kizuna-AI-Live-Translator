@@ -7,6 +7,10 @@ FEED_STATE_LIVE: FeedState = "live"
 FEED_STATE_PAUSED: FeedState = "paused"
 FEED_STATE_STOPPED: FeedState = "stopped"
 
+# The channel the operator console subscribes to for feed lifecycle events.
+# It is not a guest language, so it must never be treated as a translation target.
+OPERATOR_CHANNEL = "operator"
+
 class ConnectionManager:
     def __init__(self):
         self.active_connections: dict[str, dict[str, list[WebSocket]]] = {}
@@ -19,6 +23,8 @@ class ConnectionManager:
         
         active_langs = []
         for lang, websockets in self.active_connections[room_id].items():
+            if lang == OPERATOR_CHANNEL:
+                continue
             if len(websockets) > 0:
                 active_langs.append(lang)
         return active_langs

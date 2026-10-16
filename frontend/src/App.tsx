@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
+import OperatorConsole from './components/OperatorConsole';
 
 interface TranslationMessage {
   original: string;
@@ -14,7 +15,6 @@ export default function App() {
   const [targetLang, setTargetLang] = useState('en');
   const [messages, setMessages] = useState<TranslationMessage[]>([]);
   const [interimMessage, setInterimMessage] = useState<TranslationMessage | null>(null);
-  const [isStreaming, setIsStreaming] = useState(false);
   const [isAudioEnabled, setIsAudioEnabled] = useState(false);
   
   // Trapdoor ref so the WebSocket can read the live state of the audio toggle
@@ -25,9 +25,6 @@ export default function App() {
 
   // --- REFS ---
   const ws = useRef<WebSocket | null>(null);
-  const audioContext = useRef<AudioContext | null>(null);
-  const processor = useRef<ScriptProcessorNode | null>(null);
-  const globalStream = useRef<MediaStream | null>(null);
   
   const originalContainerRef = useRef<HTMLDivElement | null>(null);
   const translationContainerRef = useRef<HTMLDivElement | null>(null);
@@ -110,59 +107,14 @@ export default function App() {
     ws.current.onclose = () => console.log("🔌 Disconnected from Room");
   };
 
-  // --- AUDIO STREAMING ENGINE (PREACHER) ---
-  const startAudioStreaming = async (roomId: string) => {
-    try {
-      const wsUrl = `ws://localhost:8000/ws/stream/${roomId}`;
-      ws.current = new WebSocket(wsUrl);
-
-      ws.current.onopen = async () => {
-        console.log("🎙️ Audio Stream Socket Opened");
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        globalStream.current = stream;
-
-        const AudioContextCtor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        audioContext.current = new AudioContextCtor({ sampleRate: 16000 });
-        const source = audioContext.current.createMediaStreamSource(stream);
-        
-        processor.current = audioContext.current.createScriptProcessor(4096, 1, 1);
-        source.connect(processor.current);
-        processor.current.connect(audioContext.current.destination);
-
-        processor.current.onaudioprocess = (e) => {
-          if (ws.current?.readyState === WebSocket.OPEN) {
-            const inputData = e.inputBuffer.getChannelData(0);
-            const pcm16 = new Int16Array(inputData.length);
-            for (let i = 0; i < inputData.length; i++) {
-              pcm16[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7FFF;
-            }
-            ws.current.send(pcm16.buffer);
-          }
-        };
-        setIsStreaming(true);
-      };
-    } catch (err) {
-      console.error("Microphone access failed:", err);
-      alert("Please allow microphone permissions to broadcast.");
-    }
-  };
-
-  const stopAudioStreaming = () => {
-    processor.current?.disconnect();
-    audioContext.current?.close();
-    globalStream.current?.getTracks().forEach(track => track.stop());
-    ws.current?.close();
-    setIsStreaming(false);
-  };
-
   // --- ROUTING HANDLERS ---
   const handleJoinAsListener = () => {
     connectListenerWebSocket(roomInput, targetLang);
     navigate('/listener');
   };
 
-  const handleJoinAsPreacher = () => {
-    navigate('/preacher');
+  const handleOpenOperatorConsole = () => {
+    navigate('/operate');
   };
 
   return (
@@ -224,7 +176,7 @@ export default function App() {
                       <p className="text-xs text-slate-500 leading-relaxed font-medium">Stream stage audio directly to Gemini Translation arrays.</p>
                     </div>
                     <button 
-                      onClick={handleJoinAsPreacher}
+                      onClick={handleOpenOperatorConsole}
                       className="w-full py-3 bg-slate-800 hover:bg-slate-900 active:bg-black text-white font-bold rounded-xl transition-all shadow-lg shadow-slate-300 text-sm"
                     >
                       Dashboard
@@ -236,53 +188,8 @@ export default function App() {
           </div>
         } />
 
-        {/* VIEW 2: PREACHER DASHBOARD */}
-        <Route path="/preacher" element={
-          <div className="max-w-3xl mx-auto pt-10 sm:pt-20 px-4">
-            <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-10 border border-slate-100">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
-                <div>
-                  <button onClick={() => { stopAudioStreaming(); navigate('/'); }} className="text-sm font-bold text-slate-400 hover:text-indigo-600 mb-2 block transition-colors">
-                    ← Return to Hub
-                  </button>
-                  <h2 className="text-3xl font-black text-slate-900 tracking-tight">Preacher Console</h2>
-                  <p className="text-sm text-slate-500 font-mono mt-1 bg-slate-100 inline-block px-2 py-1 rounded">Channel: {roomInput}</p>
-                </div>
-                
-                {/* Status Indicator */}
-                <div className={`flex items-center gap-3 px-4 py-2 rounded-full border ${isStreaming ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-500'} shadow-sm font-bold tracking-wide uppercase text-xs`}>
-                  <span className={`h-2.5 w-2.5 rounded-full ${isStreaming ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
-                  {isStreaming ? 'Live Broadcasting' : 'Offline'}
-                </div>
-              </div>
-
-              <div className="p-8 sm:p-12 bg-slate-50 rounded-2xl border border-slate-200 text-center space-y-6">
-                <div className="inline-block p-4 bg-white rounded-full shadow-sm mb-2">
-                  <svg className={`w-8 h-8 ${isStreaming ? 'text-emerald-500' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
-                </div>
-                <p className="text-base text-slate-600 max-w-md mx-auto font-medium">
-                  Ensure your physical audio inputs are correct. Toggling transmission begins immediate low-latency streaming to the AI processing engine.
-                </p>
-                
-                {!isStreaming ? (
-                  <button 
-                    onClick={() => startAudioStreaming(roomInput)}
-                    className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xl shadow-emerald-200/50 transition-all transform active:scale-95 text-lg"
-                  >
-                    Start Live Sermon
-                  </button>
-                ) : (
-                  <button 
-                    onClick={stopAudioStreaming}
-                    className="px-8 py-4 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-xl shadow-rose-200/50 transition-all transform active:scale-95 text-lg"
-                  >
-                    Mute / End Stream
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        } />
+        {/* VIEW 2: OPERATOR CONSOLE (operator login + feed control) */}
+        <Route path="/operate" element={<OperatorConsole />} />
 
         {/* VIEW 3: GUEST LISTENER VIEW */}
         <Route path="/listener" element={

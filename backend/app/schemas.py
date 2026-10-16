@@ -34,6 +34,17 @@ class OperatorProfileResponse(BaseModel):
     email: str
     church_id: int
 
+# A room summary the operator console can pick from
+class RoomSummary(BaseModel):
+    id: int
+    is_live: bool
+
+# What the API returns for the operator's church (name + rooms to control)
+class OperatorChurchResponse(BaseModel):
+    id: int
+    name: str
+    rooms: list[RoomSummary]
+
 # What the API returns after the operator controls the live feed
 class FeedControlResponse(BaseModel):
     status: Literal["live", "paused", "stopped"]

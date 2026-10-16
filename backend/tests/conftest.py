@@ -69,3 +69,18 @@ async def operator_setup(db_session):
     await db_session.refresh(guest)
 
     return {"church": church, "operator": operator, "guest": guest, "password": TEST_PASSWORD}
+
+
+@pytest.fixture
+async def auth_headers(client, operator_setup):
+    async def _auth_headers():
+        response = await client.post(
+            "/api/operator/login",
+            json={
+                "email": operator_setup["operator"].email,
+                "password": operator_setup["password"],
+            },
+        )
+        return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+    return _auth_headers

@@ -1,5 +1,13 @@
 import asyncio
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends
+from fastapi import (
+    Depends,
+    FastAPI,
+    HTTPException,
+    WebSocket,
+    WebSocketDisconnect,
+    WebSocketException,
+    status,
+)
 from contextlib import asynccontextmanager
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +17,7 @@ from .auth import (
     get_current_operator,
     get_operator_claims,
     hash_password,
+    operator_claims_from_token,
     verify_password,
 )
 from .database import engine, Base, get_db
@@ -23,9 +32,11 @@ from .models import Church, Room, User
 from .schemas import (
     FeedControlResponse,
     GuestJoinResponse,
+    OperatorChurchResponse,
     OperatorLoginRequest,
     OperatorLoginResponse,
     OperatorProfileResponse,
+    RoomSummary,
 )
 from .gemini_worker import GeminiWorker
 
@@ -62,28 +73,46 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, language: str):
         manager.disconnect(websocket, room_id, language)
 
 @app.websocket("/ws/stream/{room_id}")
-async def stream_audio(websocket: WebSocket, room_id: str):
+async def stream_audio(
+    websocket: WebSocket,
+    room_id: int,
+    token: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
     """
-    Endpoint for Church Admin / Preacher.
-    Receives raw PCM audio bytes from microphone and feeds GeminiWorker.
+    Audio intake for the operator console.
+    Requires an operator JWT (as a query parameter — browsers cannot attach
+    headers to a WebSocket handshake) for the church that owns the room.
+    Receives raw PCM audio bytes from the mixer feed and feeds GeminiWorker.
     """
+    claims = operator_claims_from_token(token)
+    if claims is None:
+        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
+
+    room_query = select(Room).where(
+        Room.id == room_id, Room.church_id == int(claims["church_id"])
+    )
+    room = (await db.execute(room_query)).scalar_one_or_none()
+    if room is None:
+        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
+
     await websocket.accept()
     loop = asyncio.get_running_loop()
-    
-    worker = GeminiWorker(room_id, loop)
+
+    worker = GeminiWorker(str(room.id), loop)
     worker.start()
-    active_gemini_workers[room_id] = worker
-    
+    active_gemini_workers[str(room.id)] = worker
+
     try:
         while True:
             audio_chunk = await websocket.receive_bytes()
             worker.process_audio_chunk(audio_chunk)
     except WebSocketDisconnect:
-        print(f"Preacher disconnected from room {room_id}")
+        print(f"Operator disconnected from room {room_id}")
     finally:
         worker.stop()
-        if room_id in active_gemini_workers:
-            del active_gemini_workers[room_id]
+        if str(room.id) in active_gemini_workers:
+            del active_gemini_workers[str(room.id)]
 
 @app.post("/api/join/{qr_code_hash}", response_model=GuestJoinResponse)
 async def silent_guest_login(qr_code_hash: str, db: AsyncSession = Depends(get_db)):
@@ -132,6 +161,27 @@ async def operator_login(payload: OperatorLoginRequest, db: AsyncSession = Depen
 @app.get("/api/operator/me", response_model=OperatorProfileResponse)
 async def operator_profile(claims: dict = Depends(get_operator_claims)):
     return OperatorProfileResponse(email=claims["sub"], church_id=int(claims["church_id"]))
+
+@app.get("/api/operator/church", response_model=OperatorChurchResponse)
+async def operator_church(
+    church_id: int = Depends(get_current_operator),
+    db: AsyncSession = Depends(get_db),
+):
+    church = (
+        await db.execute(select(Church).where(Church.id == church_id))
+    ).scalar_one_or_none()
+    if church is None:
+        raise HTTPException(status_code=404, detail="Church not found")
+
+    rooms = (
+        await db.execute(select(Room).where(Room.church_id == church_id).order_by(Room.id))
+    ).scalars().all()
+
+    return OperatorChurchResponse(
+        id=church.id,
+        name=church.name,
+        rooms=[RoomSummary(id=room.id, is_live=room.is_live) for room in rooms],
+    )
 
 async def _apply_feed_control(
     room_id: int,
