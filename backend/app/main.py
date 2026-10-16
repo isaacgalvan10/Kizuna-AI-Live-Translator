@@ -4,11 +4,24 @@ from contextlib import asynccontextmanager
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .auth import create_operator_token, get_operator_claims, hash_password, verify_password
+from .auth import (
+    create_operator_token,
+    get_current_operator,
+    get_operator_claims,
+    hash_password,
+    verify_password,
+)
 from .database import engine, Base, get_db
-from .socket_manager import manager
+from .socket_manager import (
+    FEED_STATE_LIVE,
+    FEED_STATE_PAUSED,
+    FEED_STATE_STOPPED,
+    FeedState,
+    manager,
+)
 from .models import Church, Room, User
 from .schemas import (
+    FeedControlResponse,
     GuestJoinResponse,
     OperatorLoginRequest,
     OperatorLoginResponse,
@@ -119,6 +132,50 @@ async def operator_login(payload: OperatorLoginRequest, db: AsyncSession = Depen
 @app.get("/api/operator/me", response_model=OperatorProfileResponse)
 async def operator_profile(claims: dict = Depends(get_operator_claims)):
     return OperatorProfileResponse(email=claims["sub"], church_id=int(claims["church_id"]))
+
+async def _apply_feed_control(
+    room_id: int,
+    church_id: int,
+    state: FeedState,
+    db: AsyncSession,
+    is_live: bool | None = None,
+) -> FeedControlResponse:
+    query = select(Room).where(Room.id == room_id, Room.church_id == church_id)
+    room = (await db.execute(query)).scalar_one_or_none()
+    if room is None:
+        raise HTTPException(status_code=404, detail="Room not found")
+
+    if is_live is not None:
+        room.is_live = is_live
+        await db.commit()
+
+    await manager.broadcast_feed_state(str(room.id), state)
+
+    return FeedControlResponse(status=state)
+
+@app.post("/api/operator/rooms/{room_id}/start", response_model=FeedControlResponse)
+async def start_live_feed(
+    room_id: int,
+    church_id: int = Depends(get_current_operator),
+    db: AsyncSession = Depends(get_db),
+):
+    return await _apply_feed_control(room_id, church_id, FEED_STATE_LIVE, db, is_live=True)
+
+@app.post("/api/operator/rooms/{room_id}/pause", response_model=FeedControlResponse)
+async def pause_live_feed(
+    room_id: int,
+    church_id: int = Depends(get_current_operator),
+    db: AsyncSession = Depends(get_db),
+):
+    return await _apply_feed_control(room_id, church_id, FEED_STATE_PAUSED, db)
+
+@app.post("/api/operator/rooms/{room_id}/stop", response_model=FeedControlResponse)
+async def stop_live_feed(
+    room_id: int,
+    church_id: int = Depends(get_current_operator),
+    db: AsyncSession = Depends(get_db),
+):
+    return await _apply_feed_control(room_id, church_id, FEED_STATE_STOPPED, db, is_live=False)
 
 TEST_CHURCH_QR_HASH = "test-hash-123"
 TEST_OPERATOR_EMAIL = "operator@kizuna.test"

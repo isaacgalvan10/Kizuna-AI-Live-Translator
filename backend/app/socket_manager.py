@@ -1,5 +1,11 @@
 import json
+from typing import Literal
 from fastapi import WebSocket
+
+FeedState = Literal["live", "paused", "stopped"]
+FEED_STATE_LIVE: FeedState = "live"
+FEED_STATE_PAUSED: FeedState = "paused"
+FEED_STATE_STOPPED: FeedState = "stopped"
 
 class ConnectionManager:
     def __init__(self):
@@ -62,6 +68,25 @@ class ConnectionManager:
                 except Exception:
                     dead_connections.append(connection)
             
+            for dead in dead_connections:
+                self.disconnect(dead, room_id, language)
+
+    async def broadcast_feed_state(self, room_id: str, state: FeedState):
+        """Sends a feed lifecycle event to every listener in the room, across all languages."""
+        if room_id not in self.active_connections:
+            return
+
+        payload = json.dumps({"type": "feed_state", "data": state})
+
+        for language in list(self.active_connections[room_id].keys()):
+            dead_connections = []
+
+            for connection in self.active_connections[room_id][language]:
+                try:
+                    await connection.send_text(payload)
+                except Exception:
+                    dead_connections.append(connection)
+
             for dead in dead_connections:
                 self.disconnect(dead, room_id, language)
 

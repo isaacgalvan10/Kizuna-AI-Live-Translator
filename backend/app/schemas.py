@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Literal, Optional
 
 # Base properties shared across creation and reading
 class ChurchBase(BaseModel):
@@ -33,6 +33,10 @@ class OperatorLoginResponse(BaseModel):
 class OperatorProfileResponse(BaseModel):
     email: str
     church_id: int
+
+# What the API returns after the operator controls the live feed
+class FeedControlResponse(BaseModel):
+    status: Literal["live", "paused", "stopped"]
 
 # What the API returns after a successful QR scan
 class GuestJoinResponse(BaseModel):
