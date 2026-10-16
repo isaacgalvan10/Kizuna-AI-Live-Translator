@@ -3,9 +3,9 @@ import type { FormEvent } from 'react';
 import { isAxiosError } from 'axios';
 import { QRCodeCanvas } from 'qrcode.react';
 import api from '../api';
+import { WS_ORIGIN } from '../ws';
 
 const TOKEN_STORAGE_KEY = 'kizuna_operator_token';
-const WS_ORIGIN = 'ws://localhost:8000';
 // The QR must encode the address guests can actually reach. In production that
 // is the app's own origin; VITE_PUBLIC_ORIGIN overrides it for setups where the
 // operator's URL (e.g. localhost) differs from the guests' URL.

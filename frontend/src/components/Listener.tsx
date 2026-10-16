@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
+import { WS_ORIGIN } from '../ws';
 
 type FeedState = 'live' | 'paused' | 'stopped';
 // The listener view also has a Waiting state before the day's feed starts.
 type ListenerState = 'waiting' | FeedState;
 
-const WS_ORIGIN = 'ws://localhost:8000';
 const PRIMER_TEXT = 'Audio active';
 
 // Language codes on the wire, BCP 47 tags for the browser's voice engine.

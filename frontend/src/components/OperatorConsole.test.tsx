@@ -267,7 +267,7 @@ describe('feed control', () => {
       })
     );
     const streamSocket = FakeWebSocket.find('/ws/stream/');
-    expect(streamSocket.url).toBe('ws://localhost:8000/ws/stream/3?token=stored-token');
+    expect(streamSocket.url).toBe('ws://localhost:5173/ws/stream/3?token=stored-token');
     expect(await screen.findByRole('status')).toHaveTextContent('Live');
   });
 
@@ -370,7 +370,7 @@ describe('feed state over WebSocket', () => {
   it('reflects feed_state events from the room', async () => {
     await renderConsoleWithStoredSession();
     const feedSocket = FakeWebSocket.find('/ws/listen/3/operator');
-    expect(feedSocket.url).toBe('ws://localhost:8000/ws/listen/3/operator');
+    expect(feedSocket.url).toBe('ws://localhost:5173/ws/listen/3/operator');
     expect(screen.getByRole('status')).toHaveTextContent('Stopped');
 
     act(() => feedSocket.receive({ type: 'feed_state', data: 'paused' }));
