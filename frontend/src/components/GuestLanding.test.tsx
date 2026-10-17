@@ -42,6 +42,20 @@ function renderLanding(path: string) {
   );
 }
 
+// The redesign's guard rails, not its look: jsdom has no CSS engine, so the
+// restyle is pinned by what must be absent (glass, retired palette) and by the
+// behaviour that must survive (keyboard activation).
+const RETIRED_STYLES = /backdrop|indigo|slate|violet|rose-\d|amber-\d|bg-white/;
+
+function expectNoRetiredStyles(container: HTMLElement) {
+  for (const element of container.querySelectorAll<HTMLElement>('[class]')) {
+    expect(
+      element.className,
+      `${element.tagName.toLowerCase()} still wears a retired style: ${element.className}`
+    ).not.toMatch(RETIRED_STYLES);
+  }
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -83,6 +97,45 @@ describe('a scanned QR code', () => {
     await user.click(screen.getByRole('button', { name: /chinese/i }));
 
     expect(screen.getByTestId('listen-probe')).toHaveTextContent('3|zh-hans|false');
+  });
+});
+
+describe('the Kizuna restyle', () => {
+  it('renders the picker and its not-started notice without glass or the retired palette', async () => {
+    mockedPost.mockResolvedValue({ data: { ...LIVE_JOIN, is_live: false } });
+
+    const { container } = renderLanding('/?qr=test-hash-123');
+    await screen.findByText(/hasn't started/i);
+
+    expectNoRetiredStyles(container);
+  });
+
+  it('renders the error state without glass or the retired palette', async () => {
+    mockedPost.mockRejectedValue(
+      Object.assign(new Error('Not Found'), {
+        isAxiosError: true,
+        response: { status: 404 },
+      })
+    );
+
+    const { container } = renderLanding('/?qr=unknown-hash');
+    await screen.findByRole('alert');
+
+    expectNoRetiredStyles(container);
+  });
+
+  it('keeps the language buttons reachable and activatable by keyboard', async () => {
+    const user = userEvent.setup();
+    mockedPost.mockResolvedValue({ data: LIVE_JOIN });
+
+    renderLanding('/?qr=test-hash-123');
+    await screen.findByText('Kizuna Test Church');
+
+    await user.tab();
+    expect(screen.getByRole('button', { name: /english/i })).toHaveFocus();
+
+    await user.keyboard('{Enter}');
+    expect(screen.getByTestId('listen-probe')).toHaveTextContent('3|en|true');
   });
 });
 
