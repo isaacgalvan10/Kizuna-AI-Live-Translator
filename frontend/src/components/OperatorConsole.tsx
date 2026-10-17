@@ -3,6 +3,8 @@ import type { FormEvent } from 'react';
 import { isAxiosError } from 'axios';
 import { QRCodeCanvas } from 'qrcode.react';
 import api from '../api';
+import { OPERATOR_STATE_VISUALS } from '../feedStateVisuals';
+import type { FeedState } from '../feedStateVisuals';
 import { WS_ORIGIN } from '../ws';
 
 const TOKEN_STORAGE_KEY = 'kizuna_operator_token';
@@ -23,8 +25,6 @@ function qrFileName(churchName: string) {
   return `kizuna-${slug || 'church'}-qr.png`;
 }
 
-type FeedState = 'live' | 'paused' | 'stopped';
-
 interface RoomSummary {
   id: number;
   is_live: boolean;
@@ -37,33 +37,20 @@ interface OperatorChurch {
   rooms: RoomSummary[];
 }
 
-const FEED_STATE_UI: Record<FeedState, { label: string; pill: string; dot: string }> = {
-  live: {
-    label: 'Live',
-    pill: 'bg-emerald-50/80 border-emerald-300/70 text-emerald-800',
-    dot: 'bg-emerald-500 motion-safe:animate-pulse',
-  },
-  paused: {
-    label: 'Paused',
-    pill: 'bg-amber-50/80 border-amber-300/70 text-amber-800',
-    dot: 'bg-amber-500',
-  },
-  stopped: {
-    label: 'Stopped',
-    pill: 'bg-slate-100/80 border-slate-300/70 text-slate-600',
-    dot: 'bg-slate-400',
-  },
-};
-
 function authHeaders(token: string) {
   return { Authorization: `Bearer ${token}` };
 }
+
+// Feed actions wear their state colours (state outranks the brand): the
+// emerald Start/Resume ramp, the amber Pause ramp, the rose Stop ramp.
+const FEED_BUTTON =
+  'cursor-pointer rounded-2xl bg-linear-to-b py-5 text-[21px] font-extrabold tracking-[0.02em] text-btn-ink transition-[filter] duration-150 enabled:hover:brightness-[1.08] enabled:active:brightness-[0.94] disabled:cursor-not-allowed disabled:bg-none disabled:bg-sand-deep disabled:text-mute';
 
 function ErrorBanner({ message }: { message: string }) {
   return (
     <p
       role="alert"
-      className="text-sm font-bold text-rose-700 bg-rose-50/80 backdrop-blur-sm border border-rose-200/70 rounded-xl px-4 py-3"
+      className="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm font-bold text-danger-ink"
     >
       {message}
     </p>
@@ -337,24 +324,30 @@ export default function OperatorConsole() {
 
   if (!token || !church) {
     return (
-      <div className="flex items-center justify-center min-h-screen p-4">
+      <div className="flex items-center justify-center min-h-screen p-5">
         <form
           onSubmit={handleLogin}
-          className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl shadow-indigo-200/40 p-8 sm:p-12 w-full max-w-md border border-white/60 ring-1 ring-slate-900/5"
+          className="w-full max-w-md rounded-3xl border border-line bg-sand-card px-8 py-10 sm:px-10 sm:py-11"
           aria-label="Operator login"
         >
-          <div className="text-center mb-10">
-            <h1 className="text-4xl font-black tracking-tight text-indigo-600 mb-2">絆 KIZUNA</h1>
-            <p className="text-sm text-slate-500 font-bold uppercase tracking-widest">
+          <div className="text-center mb-8.5">
+            <h1 className="font-serif text-[34px] font-bold tracking-[0.01em] text-brand">
+              絆 KIZUNA
+            </h1>
+            <div
+              className="mx-auto mt-2.5 h-px w-16 bg-linear-to-r from-transparent via-brand/85 to-transparent"
+              aria-hidden="true"
+            />
+            <p className="mt-3 text-[11px] font-bold uppercase tracking-[0.18em] text-dim">
               Operator Console
             </p>
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-5">
             <div>
               <label
                 htmlFor="operator-email"
-                className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2"
+                className="block mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-dim"
               >
                 Email
               </label>
@@ -364,14 +357,14 @@ export default function OperatorConsole() {
                 autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-4 bg-white/70 border border-slate-300/70 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors duration-200 font-medium text-slate-800 text-lg"
+                className="w-full rounded-xl border border-line bg-sand-raise px-[15px] py-[13px] text-base font-medium text-ink outline-none transition duration-150 focus:border-brand-line focus:ring-[3px] focus:ring-brand-wash"
               />
             </div>
 
             <div>
               <label
                 htmlFor="operator-password"
-                className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2"
+                className="block mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-dim"
               >
                 Password
               </label>
@@ -381,7 +374,7 @@ export default function OperatorConsole() {
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-4 bg-white/70 border border-slate-300/70 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors duration-200 font-medium text-slate-800 text-lg"
+                className="w-full rounded-xl border border-line bg-sand-raise px-[15px] py-[13px] text-base font-medium text-ink outline-none transition duration-150 focus:border-brand-line focus:ring-[3px] focus:ring-brand-wash"
               />
             </div>
 
@@ -390,7 +383,7 @@ export default function OperatorConsole() {
             <button
               type="submit"
               disabled={isBusy}
-              className="w-full cursor-pointer py-5 bg-gradient-to-b from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 active:from-indigo-700 active:to-indigo-800 disabled:from-slate-300 disabled:to-slate-300 text-white font-black rounded-2xl transition-colors duration-200 shadow-lg shadow-indigo-500/25 text-xl tracking-wide"
+              className="w-full mt-2 cursor-pointer rounded-2xl border border-btn-border bg-linear-to-b from-btn to-btn-deep py-4 text-[19px] font-extrabold tracking-[0.02em] text-btn-ink transition-[filter] duration-150 enabled:hover:brightness-[1.08] enabled:active:brightness-[0.94] disabled:cursor-not-allowed disabled:opacity-60"
             >
               Log in
             </button>
@@ -401,12 +394,14 @@ export default function OperatorConsole() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto pt-10 sm:pt-20 px-4">
-      <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl shadow-indigo-200/40 p-6 sm:p-10 border border-white/60 ring-1 ring-slate-900/5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
+    <div className="max-w-3xl mx-auto px-6 pt-14 pb-12">
+      <div className="rounded-3xl border border-line bg-sand-card p-6 sm:p-9">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-7">
           <div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight">{church.name}</h1>
-            <p className="text-sm text-slate-500 font-mono mt-2 bg-white/70 backdrop-blur-sm inline-block px-3 py-1 rounded">
+            <h1 className="font-serif text-[27px] font-bold tracking-[-0.01em] text-ink">
+              {church.name}
+            </h1>
+            <p className="mt-2.5 inline-block rounded-md border border-line bg-sand-deep px-2.5 py-[3px] font-mono text-[13px] text-dim">
               Room #{church.rooms[0]?.id}
             </p>
           </div>
@@ -414,48 +409,51 @@ export default function OperatorConsole() {
           <div
             role="status"
             aria-live="polite"
-            className={`flex items-center gap-3 px-5 py-3 rounded-full border backdrop-blur-sm font-black tracking-wide uppercase text-sm ${FEED_STATE_UI[status].pill}`}
+            className={`flex items-center gap-2 rounded-full border px-[18px] py-[11px] text-[12.5px] font-bold tracking-[0.09em] uppercase shadow-float ${OPERATOR_STATE_VISUALS[status].pill}`}
           >
-            <span className={`h-3 w-3 rounded-full ${FEED_STATE_UI[status].dot}`} />
-            {FEED_STATE_UI[status].label}
+            <span className={`h-[11px] w-[11px] rounded-full ${OPERATOR_STATE_VISUALS[status].dot}`} />
+            {OPERATOR_STATE_VISUALS[status].label}
           </div>
         </div>
 
         {roomId === null ? (
-          <div className="p-8 bg-white/60 backdrop-blur-sm rounded-2xl border border-white/60 ring-1 ring-slate-900/5 text-center">
-            <p className="text-base font-bold text-slate-600">
+          <div className="rounded-2xl border border-line-soft bg-sand-panel p-8 text-center">
+            <p className="text-base font-bold text-body">
               No room configured for this church. Ask your church admin to set one up.
             </p>
           </div>
         ) : (
-          <div className="p-6 sm:p-10 bg-white/50 backdrop-blur-sm rounded-2xl border border-white/60 ring-1 ring-slate-900/5 space-y-6">
+          <div className="rounded-2xl border border-line-soft bg-sand-panel p-6.5 space-y-4.5">
             {error && <ErrorBanner message={error} />}
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
               <button
                 onClick={handleStart}
                 disabled={status === 'live'}
-                className="py-6 cursor-pointer bg-gradient-to-b from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 active:from-emerald-700 active:to-emerald-800 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 text-white font-black rounded-2xl transition-colors duration-200 shadow-lg shadow-emerald-500/25 text-2xl tracking-wide"
+                className={`${FEED_BUTTON} from-live-btn to-live-btn-deep`}
               >
+                <span aria-hidden="true" className="mr-[11px] align-[2px] text-[0.68em] opacity-90">
+                  ▶
+                </span>
                 {status === 'paused' ? 'Resume' : 'Start'}
               </button>
               <button
                 onClick={handlePause}
                 disabled={status !== 'live'}
-                className="py-6 cursor-pointer bg-gradient-to-b from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 active:from-amber-700 active:to-amber-800 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 text-white font-black rounded-2xl transition-colors duration-200 shadow-lg shadow-amber-500/25 text-2xl tracking-wide"
+                className={`${FEED_BUTTON} from-paused-btn to-paused-btn-deep`}
               >
                 Pause
               </button>
               <button
                 onClick={handleStop}
                 disabled={status === 'stopped'}
-                className="py-6 cursor-pointer bg-gradient-to-b from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 active:from-rose-700 active:to-rose-800 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 text-white font-black rounded-2xl transition-colors duration-200 shadow-lg shadow-rose-500/25 text-2xl tracking-wide"
+                className={`${FEED_BUTTON} from-danger-btn to-danger-btn-deep`}
               >
                 Stop
               </button>
             </div>
 
-            <p className="text-sm text-slate-500 font-medium text-center">
+            <p className="text-center text-[13px] text-dim">
               {status === 'live' && 'Streaming the mixer feed. Translations are live.'}
               {status === 'paused' && 'Feed paused. Guests see the Paused banner.'}
               {status === 'stopped' && 'Press Start when the sermon begins.'}
@@ -463,42 +461,40 @@ export default function OperatorConsole() {
           </div>
         )}
 
-        <div className="mt-6 p-6 sm:p-8 bg-white/70 backdrop-blur-xl border border-white/60 ring-1 ring-slate-900/5 rounded-2xl">
-          <div className="flex flex-col sm:flex-row items-center gap-6">
-            <div className="bg-white p-3 border border-slate-200 rounded-xl shrink-0">
-              <QRCodeCanvas
-                ref={qrCanvasRef}
-                value={guestJoinUrl(church.qr_code_hash)}
-                size={512}
-                level="M"
-                marginSize={4}
-                style={{ width: 176, height: 176 }}
-                aria-label="Guest QR code"
-              />
-            </div>
-            <div className="text-center sm:text-left space-y-2 min-w-0">
-              <h2 className="text-lg font-black text-slate-900">Guest QR</h2>
-              <p className="text-sm text-slate-500 font-medium">
-                Print this code and place it where guests can scan it. It is permanent for
-                this church — the same QR keeps working when the operator password changes.
-              </p>
-              <p className="text-xs font-mono text-slate-600 break-all">
-                {guestJoinUrl(church.qr_code_hash)}
-              </p>
-              <button
-                onClick={handleDownloadQr}
-                className="px-5 py-3 cursor-pointer bg-slate-800 hover:bg-slate-900 active:bg-black text-white text-sm font-bold rounded-xl transition-colors duration-200 shadow-lg shadow-slate-300/50"
-              >
-                Download QR
-              </button>
-            </div>
+        <div className="mt-5.5 flex flex-col sm:flex-row items-center gap-6 rounded-2xl border border-line bg-sand-panel p-6">
+          <div className="shrink-0 rounded-xl bg-white p-3 shadow-qr">
+            <QRCodeCanvas
+              ref={qrCanvasRef}
+              value={guestJoinUrl(church.qr_code_hash)}
+              size={512}
+              level="M"
+              marginSize={4}
+              style={{ width: 176, height: 176 }}
+              aria-label="Guest QR code"
+            />
+          </div>
+          <div className="min-w-0 space-y-2.5 text-center sm:text-left">
+            <h2 className="font-serif text-[19px] font-bold text-ink">Guest QR</h2>
+            <p className="text-[13px] leading-[1.55] text-dim">
+              Print this code and place it where guests can scan it. It is permanent for
+              this church — the same QR keeps working when the operator password changes.
+            </p>
+            <p className="font-mono text-xs text-dim break-all">
+              {guestJoinUrl(church.qr_code_hash)}
+            </p>
+            <button
+              onClick={handleDownloadQr}
+              className="cursor-pointer rounded-xl border border-ink bg-ink px-4.5 py-2.5 text-[13px] font-bold text-sand-raise transition-[filter] duration-150 hover:brightness-[1.15]"
+            >
+              Download QR
+            </button>
           </div>
         </div>
 
-        <div className="mt-8 flex justify-end">
+        <div className="mt-6.5 flex justify-end">
           <button
             onClick={handleLogout}
-            className="px-6 py-3 cursor-pointer text-sm font-bold text-slate-500 hover:text-rose-600 hover:bg-rose-50/80 rounded-xl transition-colors duration-200"
+            className="cursor-pointer rounded-xl px-4 py-2.5 text-[13px] font-bold text-dim transition-colors duration-150 hover:bg-danger-soft hover:text-danger-ink"
           >
             Log out
           </button>
