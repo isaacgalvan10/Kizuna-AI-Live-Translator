@@ -3,9 +3,10 @@ import type { FormEvent } from 'react';
 import { isAxiosError } from 'axios';
 import { QRCodeCanvas } from 'qrcode.react';
 import api from '../api';
-import { OPERATOR_STATE_VISUALS } from '../feedStateVisuals';
+import { FEED_BUTTON_RAMPS, OPERATOR_STATE_VISUALS } from '../feedStateVisuals';
 import type { FeedState } from '../feedStateVisuals';
 import { WS_ORIGIN } from '../ws';
+import BrandMark from './BrandMark';
 
 const TOKEN_STORAGE_KEY = 'kizuna_operator_token';
 // The QR must encode the address guests can actually reach. In production that
@@ -41,10 +42,16 @@ function authHeaders(token: string) {
   return { Authorization: `Bearer ${token}` };
 }
 
-// Feed actions wear their state colours (state outranks the brand): the
-// emerald Start/Resume ramp, the amber Pause ramp, the rose Stop ramp.
+// Shared feed-button chrome; the per-state state-colour ramps (state outranks
+// the brand) come from FEED_BUTTON_RAMPS in feedStateVisuals.ts.
 const FEED_BUTTON =
   'cursor-pointer rounded-2xl bg-linear-to-b py-5 text-[21px] font-extrabold tracking-[0.02em] text-btn-ink transition-[filter] duration-150 enabled:hover:brightness-[1.08] enabled:active:brightness-[0.94] disabled:cursor-not-allowed disabled:bg-none disabled:bg-sand-deep disabled:text-mute';
+
+// The one keyboard focus indicator, shared with the guest language buttons:
+// the --color-focus token (brand evergreen at 70%, >=3:1 against the card and
+// panel surfaces) in the same 2px offset outline treatment.
+const FOCUS =
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus';
 
 function ErrorBanner({ message }: { message: string }) {
   return (
@@ -331,13 +338,7 @@ export default function OperatorConsole() {
           aria-label="Operator login"
         >
           <div className="text-center mb-8.5">
-            <h1 className="font-serif text-[34px] font-bold tracking-[0.01em] text-brand">
-              絆 KIZUNA
-            </h1>
-            <div
-              className="mx-auto mt-2.5 h-px w-16 bg-linear-to-r from-transparent via-brand/85 to-transparent"
-              aria-hidden="true"
-            />
+            <BrandMark size="page" />
             <p className="mt-3 text-[11px] font-bold uppercase tracking-[0.18em] text-dim">
               Operator Console
             </p>
@@ -357,7 +358,7 @@ export default function OperatorConsole() {
                 autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-xl border border-line bg-sand-raise px-[15px] py-[13px] text-base font-medium text-ink outline-none transition duration-150 focus:border-brand-line focus:ring-[3px] focus:ring-brand-wash"
+                className={`w-full rounded-xl border border-line bg-sand-raise px-[15px] py-[13px] text-base font-medium text-ink ${FOCUS}`}
               />
             </div>
 
@@ -374,7 +375,7 @@ export default function OperatorConsole() {
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-xl border border-line bg-sand-raise px-[15px] py-[13px] text-base font-medium text-ink outline-none transition duration-150 focus:border-brand-line focus:ring-[3px] focus:ring-brand-wash"
+                className={`w-full rounded-xl border border-line bg-sand-raise px-[15px] py-[13px] text-base font-medium text-ink ${FOCUS}`}
               />
             </div>
 
@@ -383,7 +384,7 @@ export default function OperatorConsole() {
             <button
               type="submit"
               disabled={isBusy}
-              className="w-full mt-2 cursor-pointer rounded-2xl border border-btn-border bg-linear-to-b from-btn to-btn-deep py-4 text-[19px] font-extrabold tracking-[0.02em] text-btn-ink transition-[filter] duration-150 enabled:hover:brightness-[1.08] enabled:active:brightness-[0.94] disabled:cursor-not-allowed disabled:opacity-60"
+              className={`w-full mt-2 cursor-pointer rounded-2xl border border-btn-border bg-linear-to-b from-btn to-btn-deep py-4 text-[19px] font-extrabold tracking-[0.02em] text-btn-ink transition-[filter] duration-150 enabled:hover:brightness-[1.08] enabled:active:brightness-[0.94] disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS}`}
             >
               Log in
             </button>
@@ -430,7 +431,7 @@ export default function OperatorConsole() {
               <button
                 onClick={handleStart}
                 disabled={status === 'live'}
-                className={`${FEED_BUTTON} from-live-btn to-live-btn-deep`}
+                className={`${FEED_BUTTON} ${FEED_BUTTON_RAMPS.live.from} ${FEED_BUTTON_RAMPS.live.to} ${FOCUS}`}
               >
                 <span aria-hidden="true" className="mr-[11px] align-[2px] text-[0.68em] opacity-90">
                   ▶
@@ -440,14 +441,14 @@ export default function OperatorConsole() {
               <button
                 onClick={handlePause}
                 disabled={status !== 'live'}
-                className={`${FEED_BUTTON} from-paused-btn to-paused-btn-deep`}
+                className={`${FEED_BUTTON} ${FEED_BUTTON_RAMPS.paused.from} ${FEED_BUTTON_RAMPS.paused.to} ${FOCUS}`}
               >
                 Pause
               </button>
               <button
                 onClick={handleStop}
                 disabled={status === 'stopped'}
-                className={`${FEED_BUTTON} from-danger-btn to-danger-btn-deep`}
+                className={`${FEED_BUTTON} ${FEED_BUTTON_RAMPS.danger.from} ${FEED_BUTTON_RAMPS.danger.to} ${FOCUS}`}
               >
                 Stop
               </button>
@@ -484,7 +485,7 @@ export default function OperatorConsole() {
             </p>
             <button
               onClick={handleDownloadQr}
-              className="cursor-pointer rounded-xl border border-ink bg-ink px-4.5 py-2.5 text-[13px] font-bold text-sand-raise transition-[filter] duration-150 hover:brightness-[1.15]"
+              className={`cursor-pointer rounded-xl border border-ink bg-ink px-4.5 py-2.5 text-[13px] font-bold text-sand-raise transition-[filter] duration-150 hover:brightness-[1.15] ${FOCUS}`}
             >
               Download QR
             </button>
@@ -494,7 +495,7 @@ export default function OperatorConsole() {
         <div className="mt-6.5 flex justify-end">
           <button
             onClick={handleLogout}
-            className="cursor-pointer rounded-xl px-4 py-2.5 text-[13px] font-bold text-dim transition-colors duration-150 hover:bg-danger-soft hover:text-danger-ink"
+            className={`cursor-pointer rounded-xl px-4 py-2.5 text-[13px] font-bold text-dim transition-colors duration-150 hover:bg-danger-soft hover:text-danger-ink ${FOCUS}`}
           >
             Log out
           </button>

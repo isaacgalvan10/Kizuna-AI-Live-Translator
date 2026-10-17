@@ -5,6 +5,7 @@ import type { Mock } from 'vitest';
 import OperatorConsole from './OperatorConsole';
 import { OPERATOR_STATE_VISUALS } from '../feedStateVisuals';
 import api from '../api';
+import { retiredStyleViolations } from '../test/retiredStyles';
 
 vi.mock('../api', () => ({
   default: { get: vi.fn(), post: vi.fn() },
@@ -106,19 +107,10 @@ async function renderConsoleWithStoredSession() {
 }
 
 // The redesign's guard rails, not its look: jsdom has no CSS engine, so the
-// restyle is pinned by what must be absent. The QR card's plain bg-white is
-// deliberate (scanner quiet zone); translucent white, the glass blur and the
-// retired palette are not.
-const RETIRED_STYLES = /backdrop|indigo|slate|violet|rose-\d|amber-\d|emerald-\d|bg-white\//;
-
-function expectNoRetiredStyles(container: HTMLElement) {
-  for (const element of container.querySelectorAll<HTMLElement>('[class]')) {
-    expect(
-      element.className,
-      `${element.tagName.toLowerCase()} still wears a retired style: ${element.className}`
-    ).not.toMatch(RETIRED_STYLES);
-  }
-}
+// restyle is pinned by what must be absent via the shared guard in
+// test/retiredStyles.ts. The QR card's bare `bg-white` is deliberate — a
+// scanner/print quiet zone — so it is the one explicit allowance.
+const QR_QUIET_ZONE_ALLOWANCE = ['bg-white'];
 
 const originalGetContext = HTMLCanvasElement.prototype.getContext;
 
@@ -491,13 +483,13 @@ describe('the Kizuna restyle', () => {
   it('renders the console without glass or the retired palette', async () => {
     const { container } = await renderConsoleWithStoredSession();
 
-    expectNoRetiredStyles(container);
+    expect(retiredStyleViolations(container, QR_QUIET_ZONE_ALLOWANCE)).toEqual([]);
   });
 
   it('renders the login card without glass or the retired palette', () => {
     const { container } = render(<OperatorConsole />);
 
-    expectNoRetiredStyles(container);
+    expect(retiredStyleViolations(container)).toEqual([]);
   });
 });
 

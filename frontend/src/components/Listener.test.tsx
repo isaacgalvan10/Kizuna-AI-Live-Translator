@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Listener from './Listener';
 import { LISTENER_STATE_VISUALS } from '../feedStateVisuals';
 import type { ListenerState } from '../feedStateVisuals';
+import { retiredStyleViolations } from '../test/retiredStyles';
 
 class FakeWebSocket {
   static instances: FakeWebSocket[] = [];
@@ -376,24 +377,13 @@ describe('reading a previous line', () => {
 });
 
 // The redesign's guard rails, not its look: jsdom has no CSS engine, so the
-// restyle is pinned by what must be absent (glass, the retired palette) and by
-// what the settled design promises (serif reading lines, a motion-safe pulse).
-const RETIRED_STYLES = /backdrop|indigo|slate|violet|emerald-\d|amber-\d|bg-white/;
+// restyle is pinned by what must be absent (glass, the retired palette, white —
+// the shared guard in test/retiredStyles.ts) and by what the settled design
+// promises (serif reading lines, a motion-safe pulse).
 const SERIF_READING_LINE = /font-serif/;
 const READING_SIZE_OR_LARGER = /text-(?:lg|xl|2xl|3xl)|text-\[(?:1[89]|[2-9]\d)px\]/;
 const READING_MEASURE = /max-w-\[\d+(?:\.\d+)?em\]/;
 const BOXED_LINE = /rounded-|shadow-/;
-
-function expectNoRetiredStyles(container: HTMLElement) {
-  for (const element of container.querySelectorAll<HTMLElement>('[class]')) {
-    // SVG elements expose className as an SVGAnimatedString, so read the attribute.
-    const className = element.getAttribute('class') ?? '';
-    expect(
-      className,
-      `${element.tagName.toLowerCase()} still wears a retired style: ${className}`
-    ).not.toMatch(RETIRED_STYLES);
-  }
-}
 
 function expectClasses(element: HTMLElement, classes: string) {
   for (const className of classes.split(/\s+/)) {
@@ -409,7 +399,7 @@ describe('the Kizuna restyle', () => {
     const { container } = renderListener('/listen/3/en');
 
     expect(screen.getByText(/waiting for operator/i)).toBeInTheDocument();
-    expectNoRetiredStyles(container);
+    expect(retiredStyleViolations(container)).toEqual([]);
   });
 
   it('renders lines, the interim line and the state banners without glass or the retired palette', () => {
@@ -428,15 +418,15 @@ describe('the Kizuna restyle', () => {
         data: { original: '神は語って', translation: 'God is speaking' },
       })
     );
-    expectNoRetiredStyles(container);
+    expect(retiredStyleViolations(container)).toEqual([]);
 
     act(() => socket.receive({ type: 'feed_state', data: 'paused' }));
     expect(screen.getByText(/paused — worship music/i)).toBeInTheDocument();
-    expectNoRetiredStyles(container);
+    expect(retiredStyleViolations(container)).toEqual([]);
 
     act(() => socket.receive({ type: 'feed_state', data: 'stopped' }));
     expect(screen.getByText(/service ended/i)).toBeInTheDocument();
-    expectNoRetiredStyles(container);
+    expect(retiredStyleViolations(container)).toEqual([]);
   });
 
   it('sets both panels as flowing serif text at reading size with a reading measure, not per-line boxes', () => {

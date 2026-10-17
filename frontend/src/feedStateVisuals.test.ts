@@ -56,9 +56,9 @@ describe('the shared Live Feed State visuals', () => {
     expect(OPERATOR_STATE_VISUALS.stopped.dot).toBe(LISTENER_STATE_VISUALS.stopped.dot);
   });
 
-  it('maps the listener Waiting state to the stopped family', () => {
-    expect(LISTENER_STATE_VISUALS.waiting.pill).toBe(LISTENER_STATE_VISUALS.stopped.pill);
-    expect(LISTENER_STATE_VISUALS.waiting.dot).toBe(LISTENER_STATE_VISUALS.stopped.dot);
+  it('gives Waiting its own muted presentation, distinct from Ended', () => {
+    expect(LISTENER_STATE_VISUALS.waiting.pill).not.toBe(LISTENER_STATE_VISUALS.stopped.pill);
+    expect(LISTENER_STATE_VISUALS.waiting.dot).not.toBe(LISTENER_STATE_VISUALS.stopped.dot);
   });
 
   it('keeps the Live dot pulse gated behind motion-safe', () => {
@@ -67,11 +67,11 @@ describe('the shared Live Feed State visuals', () => {
   });
 });
 
-// Each state draws from its own @theme token family (Waiting shares the
-// stopped family), so no view can smuggle in a literal colour or a
-// default-palette utility.
-const STATE_FAMILY: Record<string, 'live' | 'paused' | 'stopped'> = {
-  waiting: 'stopped',
+// Each state draws from its own @theme token family (Waiting wears its own
+// muted waiting- family, a softer grey than Ended), so no view can smuggle in
+// a literal colour or a default-palette utility.
+const STATE_FAMILY: Record<string, 'waiting' | 'live' | 'paused' | 'stopped'> = {
+  waiting: 'waiting',
   live: 'live',
   paused: 'paused',
   stopped: 'stopped',

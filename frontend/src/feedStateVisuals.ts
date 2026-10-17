@@ -32,7 +32,14 @@ const SHARED_PRESENTATION: Record<FeedState, Omit<FeedStateVisuals, 'label'>> = 
 };
 
 export const LISTENER_STATE_VISUALS: Record<ListenerState, FeedStateVisuals> = {
-  waiting: { label: 'Waiting', ...SHARED_PRESENTATION.stopped },
+  // Waiting is listener-only and deliberately softer than Ended: the same grey
+  // hue, but a weaker pill (softer fill and line) and a lighter dot, so a guest
+  // never reads "the service is over" before it has started.
+  waiting: {
+    label: 'Waiting',
+    pill: 'bg-waiting-soft border-waiting-line text-waiting-ink',
+    dot: 'bg-waiting',
+  },
   live: { label: 'Live', ...SHARED_PRESENTATION.live },
   paused: { label: 'Paused', ...SHARED_PRESENTATION.paused },
   stopped: { label: 'Ended', ...SHARED_PRESENTATION.stopped },
@@ -42,4 +49,19 @@ export const OPERATOR_STATE_VISUALS: Record<FeedState, FeedStateVisuals> = {
   live: { label: 'Live', ...SHARED_PRESENTATION.live },
   paused: { label: 'Paused', ...SHARED_PRESENTATION.paused },
   stopped: { label: 'Stopped', ...SHARED_PRESENTATION.stopped },
+};
+
+// The console's feed-action buttons wear their state colours: the emerald
+// Start/Resume ramp, the amber Pause ramp, the rose Stop ramp. Kept as complete
+// literal utilities (never composed from variables) so Tailwind's scanner still
+// sees them; the contrast suite maps each back to the token it must name.
+export interface FeedButtonRamp {
+  from: string;
+  to: string;
+}
+
+export const FEED_BUTTON_RAMPS: Record<'live' | 'paused' | 'danger', FeedButtonRamp> = {
+  live: { from: 'from-live-btn', to: 'to-live-btn-deep' },
+  paused: { from: 'from-paused-btn', to: 'to-paused-btn-deep' },
+  danger: { from: 'from-danger-btn', to: 'to-danger-btn-deep' },
 };

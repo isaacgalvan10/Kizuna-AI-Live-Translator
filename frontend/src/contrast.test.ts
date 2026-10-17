@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import css from './index.css?raw';
-import guestLandingSource from './components/GuestLanding.tsx?raw';
+import { FEED_BUTTON_RAMPS } from './feedStateVisuals';
 
 // The @theme block in index.css is the single source of truth for every colour
 // in the app (theme.test.tsx guards its shape; this suite guards its WCAG
@@ -119,27 +119,28 @@ describe('text on the brand and button ramps clears AA 4.5:1', () => {
   );
 });
 
-// The feed buttons (FEED_BUTTON in OperatorConsole.tsx) label themselves with
-// --color-btn-ink at 21px/font-extrabold — WCAG large text (>=14pt bold), so AA
-// asks 3:1 here, not 4.5:1. 4.5:1 is unsatisfiable on the settled state ramps
-// without abandoning the locked "state colours outrank the brand" look: no ink
-// colour clears every stop — even pure black only reaches 4.47:1 on danger's
-// rose top and 3.34:1 on its deep stop, while pure white reaches only 2.70:1 on
-// the live top. The suite therefore enforces the normative large-text threshold
-// on the real button ink (pinned by OperatorConsole.test.tsx: 'text-btn-ink'),
-// on both stops of every ramp.
-const FEED_BUTTON_RAMPS = [
-  { state: 'live', stops: ['--color-live-btn', '--color-live-btn-deep'] },
-  { state: 'paused', stops: ['--color-paused-btn', '--color-paused-btn-deep'] },
-  { state: 'danger', stops: ['--color-danger-btn', '--color-danger-btn-deep'] },
-] as const;
+// The feed buttons label themselves with --color-btn-ink at 21px/font-extrabold
+// — WCAG large text (>=14pt bold), so AA asks 3:1 here, not 4.5:1. 4.5:1 is
+// unsatisfiable on the settled state ramps without abandoning the locked "state
+// colours outrank the brand" look: no ink colour clears every stop — even pure
+// black only reaches 4.47:1 on danger's rose top and 3.34:1 on its deep stop,
+// while pure white reaches only 2.70:1 on the live top. The suite therefore
+// enforces the normative large-text threshold on the real button ink (pinned by
+// OperatorConsole.test.tsx: 'text-btn-ink'), on both stops of every ramp.
+//
+// The ramp classes are owned by feedStateVisuals.ts (FEED_BUTTON_RAMPS), the
+// same data the console renders; each `from-`/`to-` utility is mapped back to
+// the `--color-*` token it must name, so a ramp can never point at a colour
+// this suite does not measure.
+const RAMP_STOPS = Object.entries(FEED_BUTTON_RAMPS).flatMap(([state, ramp]) =>
+  [ramp.from, ramp.to].map((utility) => ({
+    state,
+    stop: `--color-${utility.replace(/^(?:from|to)-/, '')}`,
+  }))
+);
 
 describe('feed button labels clear AA 3:1 (large text) on both gradient stops', () => {
-  it.each(
-    FEED_BUTTON_RAMPS.flatMap(({ state, stops }) =>
-      stops.map((stop) => ({ state, stop }))
-    )
-  )('--color-btn-ink on the $state ramp at $stop', ({ stop }) => {
+  it.each(RAMP_STOPS)('--color-btn-ink on the $state ramp at $stop', ({ stop }) => {
     const ratio = contrast(token('--color-btn-ink'), token(stop));
     expect(ratio, `btn-ink on ${stop} is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(3);
   });
@@ -154,6 +155,7 @@ const STATE_PILLS = [
   { ink: '--color-paused-ink', soft: '--color-paused-soft' },
   { ink: '--color-danger-ink', soft: '--color-danger-soft' },
   { ink: '--color-stopped-ink', soft: '--color-stopped-soft' },
+  { ink: '--color-waiting-ink', soft: '--color-waiting-soft' },
 ] as const;
 const PILL_BACKDROPS = ['--color-sand-base', '--color-sand-card'] as const;
 
@@ -177,20 +179,18 @@ describe('non-text UI boundaries clear AA 3:1', () => {
     }
   );
 
-  // The guest language buttons (GuestLanding.tsx) carry the app's only
-  // outline-brand/NN focus ring. The alpha is read from the component source so
-  // the test tracks whatever the view actually ships; the ring is offset 2px,
-  // so it composites over the card, never over the button it surrounds.
-  it('the guest focus ring (brand at its outline-brand/NN alpha) against the card', () => {
-    const match = guestLandingSource.match(/outline-brand\/(\d+)/);
-    if (match === null) {
-      throw new Error('GuestLanding.tsx carries no outline-brand/NN focus class');
+  // The one keyboard focus indicator (--color-focus, the brand evergreen at an
+  // alpha that clears 3:1) is consumed by the guest language buttons and every
+  // operator control. Offset 2px, it composites over the surface behind the
+  // control: the card (guest picker, login card) or the console's control panel.
+  it.each([{ surface: '--color-sand-card' }, { surface: '--color-sand-panel' }])(
+    'the focus indicator --color-focus against $surface',
+    ({ surface }) => {
+      const ring = over(token('--color-focus'), token(surface));
+      const ratio = contrast(ring, token(surface));
+      expect(ratio, `--color-focus on ${surface} is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(3);
     }
-    const alpha = Number(match[1]) / 100;
-    const ring = over({ ...token('--color-brand'), a: alpha }, token('--color-sand-card'));
-    const ratio = contrast(ring, token('--color-sand-card'));
-    expect(ratio, `brand at ${match[1]}% on sand-card is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(3);
-  });
+  );
 });
 
 // Inventory of pairs deliberately NOT asserted, with the ratios this suite's
@@ -202,13 +202,15 @@ describe('non-text UI boundaries clear AA 3:1', () => {
 //
 // State dots on their own soft fill over the base (decorative — the pill label
 // carries the state):
-//   live   #10B981 over live-soft        1.81:1
-//   paused #D9880A over paused-soft      2.04:1
-//   stopped #9A9078 over stopped-soft    2.29:1
+//   live    #10B981 over live-soft        1.81:1
+//   paused  #D9880A over paused-soft      2.04:1
+//   stopped #9A9078 over stopped-soft     2.29:1
+//   waiting #B1A88F over waiting-soft     1.76:1
 // State pill 1px borders over their soft fill (the fill and the label already
 // mark the pill boundary):
-//   live-line   2.40:1   paused-line  2.04:1
-//   danger-line 3.25:1   stopped-line 3.66:1
+//   live-line    2.40:1   paused-line   2.04:1
+//   danger-line  3.25:1   stopped-line  3.66:1
+//   waiting-line 1.28:1 (the muted Waiting pill is deliberately the softest)
 // The feed buttons carry no border (FEED_BUTTON in OperatorConsole.tsx has none,
 // and @theme declares no state-button border token), so the arbited "state
 // button borders" UI pair has no token to measure; if a border is ever added,
@@ -217,7 +219,7 @@ describe('non-text UI boundaries clear AA 3:1', () => {
 // exempts inactive components: on sand-base 2.92:1, on sand-card 3.19:1.
 // Known non-required text pairs for the record:
 //   dim on sand-deep (the Room # badge)      4.14:1
-// An observed gap outside this suite's agreed pair list: the operator inputs
-// focus with focus:ring-brand-wash (brand at 15%, ~1.25:1 over the card) plus
-// focus:border-brand-line (~1.76:1) — a follow-up decision, not silently fixed
-// here. The guest language buttons' focus ring is covered above.
+// Every keyboard-focusable control (the guest language buttons and all operator
+// inputs and buttons) now carries the single --color-focus outline asserted
+// above; the previous weak operator treatment (ring-brand-wash, ~1.25:1) is
+// gone with it.

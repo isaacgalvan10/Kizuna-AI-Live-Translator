@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mock } from 'vitest';
 import GuestLanding from './GuestLanding';
 import api from '../api';
+import { retiredStyleViolations } from '../test/retiredStyles';
 
 vi.mock('../api', () => ({
   default: { post: vi.fn() },
@@ -43,18 +44,9 @@ function renderLanding(path: string) {
 }
 
 // The redesign's guard rails, not its look: jsdom has no CSS engine, so the
-// restyle is pinned by what must be absent (glass, retired palette) and by the
-// behaviour that must survive (keyboard activation).
-const RETIRED_STYLES = /backdrop|indigo|slate|violet|rose-\d|amber-\d|bg-white/;
-
-function expectNoRetiredStyles(container: HTMLElement) {
-  for (const element of container.querySelectorAll<HTMLElement>('[class]')) {
-    expect(
-      element.className,
-      `${element.tagName.toLowerCase()} still wears a retired style: ${element.className}`
-    ).not.toMatch(RETIRED_STYLES);
-  }
-}
+// restyle is pinned by what must be absent (glass, retired palette, raw white —
+// the shared guard in test/retiredStyles.ts) and by the behaviour that must
+// survive (keyboard activation).
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -107,7 +99,7 @@ describe('the Kizuna restyle', () => {
     const { container } = renderLanding('/?qr=test-hash-123');
     await screen.findByText(/hasn't started/i);
 
-    expectNoRetiredStyles(container);
+    expect(retiredStyleViolations(container)).toEqual([]);
   });
 
   it('renders the error state without glass or the retired palette', async () => {
@@ -121,7 +113,7 @@ describe('the Kizuna restyle', () => {
     const { container } = renderLanding('/?qr=unknown-hash');
     await screen.findByRole('alert');
 
-    expectNoRetiredStyles(container);
+    expect(retiredStyleViolations(container)).toEqual([]);
   });
 
   it('keeps the language buttons reachable and activatable by keyboard', async () => {

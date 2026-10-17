@@ -34,6 +34,10 @@
   --color-brand-wash: rgba(30, 98, 72, 0.15);
   --color-brand-line: rgba(30, 98, 72, 0.36);
   --color-brand-tint: rgba(30, 98, 72, 0.1);
+  /* Keyboard focus indicator — the brand evergreen at 70%, >=3:1 against the
+     card and panel surfaces. The ring is offset 2px, so it composites over
+     the surface behind the control, never over the control itself. */
+  --color-focus: rgba(30, 98, 72, 0.7);
 
   /* Primary action button: bg-linear-to-b from-btn to-btn-deep */
   --color-btn: #257357;
@@ -69,6 +73,15 @@
   --color-stopped-ink: #655E4E;
   --color-stopped-soft: rgba(120, 110, 85, 0.1);
   --color-stopped-line: rgba(120, 110, 85, 0.26);
+
+  /* Waiting — the muted cousin of stopped for the pre-service state: same grey
+     hue with a softer pill and a lighter dot, so it never reads as Ended.
+     Soft/line alphas are the prototype's Waiting values; the ink is rebased
+     from the prototype's #8A8270 to clear 4.5:1 over its composited fill. */
+  --color-waiting: #B1A88F;
+  --color-waiting-ink: #686150;
+  --color-waiting-soft: rgba(120, 110, 85, 0.08);
+  --color-waiting-line: rgba(120, 110, 85, 0.22);
 
   /* Shadows — only for genuinely floating elements */
   --shadow-float: 0 6px 16px rgba(70, 58, 30, 0.16);

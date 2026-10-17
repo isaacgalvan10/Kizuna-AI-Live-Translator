@@ -42,12 +42,18 @@ const COLOUR_TOKENS = [
   '--color-brand-wash',
   '--color-brand-line',
   '--color-brand-tint',
+  // keyboard focus indicator
+  '--color-focus',
   // primary action button
   '--color-btn',
   '--color-btn-deep',
   '--color-btn-border',
   '--color-btn-ink',
-  // live feed states
+  // live feed states (waiting is the listener's pre-service state)
+  '--color-waiting',
+  '--color-waiting-ink',
+  '--color-waiting-soft',
+  '--color-waiting-line',
   '--color-live',
   '--color-live-ink',
   '--color-live-soft',
