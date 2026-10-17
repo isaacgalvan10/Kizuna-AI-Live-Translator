@@ -17,8 +17,14 @@ const LANGUAGES = [
   { code: 'zh-hans', label: '中文 (Chinese)' },
 ];
 
-const GLASS_CARD =
-  'bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl shadow-indigo-200/40 p-8 sm:p-12 w-full max-w-md border border-white/60 ring-1 ring-slate-900/5';
+const CARD =
+  'w-full max-w-[390px] text-center bg-sand-card border border-line rounded-3xl px-7 py-9';
+const BRAND_MARK = 'font-serif text-[32px] font-bold tracking-[0.01em] text-brand';
+const SEAM =
+  'mx-auto mt-2.5 h-px w-16 bg-linear-to-r from-transparent via-brand/85 to-transparent';
+const EYEBROW = 'text-[11px] font-bold uppercase tracking-[0.18em] text-dim';
+const LANGUAGE_BUTTON =
+  'w-full cursor-pointer rounded-2xl border border-btn-border bg-linear-to-b from-btn to-btn-deep py-[17px] text-[19px] font-extrabold tracking-[0.02em] text-btn-ink transition-[filter] duration-150 hover:brightness-[1.08] active:brightness-[0.94] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand/55';
 
 export default function GuestLanding() {
   const navigate = useNavigate();
@@ -68,12 +74,15 @@ export default function GuestLanding() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen p-4">
-        <div className={`${GLASS_CARD} text-center space-y-4`}>
-          <h1 className="text-4xl font-black tracking-tight text-indigo-600">絆 KIZUNA</h1>
+      <div className="flex items-center justify-center min-h-screen p-5">
+        <div className={`${CARD} space-y-4`}>
+          <div>
+            <h1 className={BRAND_MARK}>絆 KIZUNA</h1>
+            <div className={SEAM} aria-hidden="true" />
+          </div>
           <p
             role="alert"
-            className="text-sm font-bold text-rose-700 bg-rose-50/80 backdrop-blur-sm border border-rose-200/70 rounded-xl px-4 py-3"
+            className="text-sm font-bold text-danger-ink bg-danger-soft border border-danger-line rounded-xl px-4 py-3"
           >
             {error}
           </p>
@@ -84,41 +93,38 @@ export default function GuestLanding() {
 
   if (!guest) {
     return (
-      <div className="flex items-center justify-center min-h-screen p-4">
-        <div className={`${GLASS_CARD} text-center space-y-4`}>
-          <h1 className="text-4xl font-black tracking-tight text-indigo-600">絆 KIZUNA</h1>
-          <p className="text-sm text-slate-500 font-bold uppercase tracking-widest">
-            Connecting to your church…
-          </p>
-        </div>
+      <div className="flex flex-col items-center justify-center min-h-screen p-5 text-center">
+        <h1 className="font-serif text-[34px] font-bold tracking-[0.01em] text-brand">
+          絆 KIZUNA
+        </h1>
+        <p className={`${EYEBROW} mt-4.5`}>Connecting to your church…</p>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen p-4">
-      <div className={GLASS_CARD}>
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-black tracking-tight text-indigo-600 mb-2">絆 KIZUNA</h1>
-          <p className="text-lg font-bold text-slate-900">{guest.church_name}</p>
-          <p className="text-sm text-slate-500 font-bold uppercase tracking-widest mt-1">
-            Choose your language
-          </p>
-        </div>
+    <div className="flex items-center justify-center min-h-screen p-5">
+      <div className={CARD}>
+        <h1 className={BRAND_MARK}>絆 KIZUNA</h1>
+        <div className={SEAM} aria-hidden="true" />
+        <p className="mt-3.5 font-serif text-[17px] font-bold text-ink">
+          {guest.church_name}
+        </p>
+        <p className={`${EYEBROW} mt-1`}>Choose your language</p>
 
         {!guest.is_live && (
-          <p className="text-sm font-medium text-amber-800 bg-amber-50/80 backdrop-blur-sm border border-amber-200/70 rounded-xl px-4 py-3 mb-6 text-center">
+          <p className="mt-5 mb-1.5 rounded-xl border border-paused-line bg-paused-soft px-3.5 py-3 text-[13px] font-medium leading-normal text-paused-ink">
             The service hasn't started yet — pick a language now and you'll wait on the
             next screen until the operator begins.
           </p>
         )}
 
-        <div className="space-y-4">
+        <div className="mt-4.5 flex flex-col gap-3.5">
           {LANGUAGES.map((language) => (
             <button
               key={language.code}
               onClick={() => pickLanguage(language.code)}
-              className="w-full cursor-pointer py-5 bg-gradient-to-b from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 active:from-indigo-700 active:to-indigo-800 text-white font-black rounded-2xl transition-colors duration-200 shadow-lg shadow-indigo-500/25 text-xl tracking-wide"
+              className={LANGUAGE_BUTTON}
             >
               {language.label}
             </button>
