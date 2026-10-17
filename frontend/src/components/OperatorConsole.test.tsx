@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mock } from 'vitest';
 import OperatorConsole from './OperatorConsole';
+import { OPERATOR_STATE_VISUALS } from '../feedStateVisuals';
 import api from '../api';
 
 vi.mock('../api', () => ({
@@ -99,8 +100,24 @@ function stubAudioCapture() {
 async function renderConsoleWithStoredSession() {
   localStorage.setItem(TOKEN_KEY, 'stored-token');
   mockedGet.mockResolvedValue({ data: CHURCH });
-  render(<OperatorConsole />);
+  const view = render(<OperatorConsole />);
   await screen.findByText('Kizuna Test Church');
+  return view;
+}
+
+// The redesign's guard rails, not its look: jsdom has no CSS engine, so the
+// restyle is pinned by what must be absent. The QR card's plain bg-white is
+// deliberate (scanner quiet zone); translucent white, the glass blur and the
+// retired palette are not.
+const RETIRED_STYLES = /backdrop|indigo|slate|violet|rose-\d|amber-\d|emerald-\d|bg-white\//;
+
+function expectNoRetiredStyles(container: HTMLElement) {
+  for (const element of container.querySelectorAll<HTMLElement>('[class]')) {
+    expect(
+      element.className,
+      `${element.tagName.toLowerCase()} still wears a retired style: ${element.className}`
+    ).not.toMatch(RETIRED_STYLES);
+  }
 }
 
 const originalGetContext = HTMLCanvasElement.prototype.getContext;
@@ -421,6 +438,66 @@ describe('guest QR code', () => {
 
     toDataURL.mockRestore();
     click.mockRestore();
+  });
+});
+
+describe('the Kizuna restyle', () => {
+  it('presents the feed state pill through the shared module', async () => {
+    await renderConsoleWithStoredSession();
+    const feedSocket = FakeWebSocket.find('/ws/listen/3/operator');
+
+    for (const state of ['live', 'paused', 'stopped'] as const) {
+      act(() => feedSocket.receive({ type: 'feed_state', data: state }));
+
+      const pill = screen.getByRole('status');
+      expect(pill).toHaveClass(...OPERATOR_STATE_VISUALS[state].pill.split(' '));
+
+      const dot = pill.querySelector('span');
+      expect(dot).not.toBeNull();
+      expect(dot).toHaveClass(...OPERATOR_STATE_VISUALS[state].dot.split(' '));
+    }
+  });
+  it('keeps the feed buttons on the state button ramp, never the brand ramp', async () => {
+    await renderConsoleWithStoredSession();
+    const feedSocket = FakeWebSocket.find('/ws/listen/3/operator');
+
+    const start = screen.getByRole('button', { name: 'Start' });
+    expect(start).toHaveClass('from-live-btn', 'to-live-btn-deep', 'text-btn-ink');
+    expect(start).not.toHaveClass('from-btn', 'to-btn-deep');
+
+    expect(screen.getByRole('button', { name: 'Pause' })).toHaveClass(
+      'from-paused-btn',
+      'to-paused-btn-deep'
+    );
+    expect(screen.getByRole('button', { name: 'Stop' })).toHaveClass(
+      'from-danger-btn',
+      'to-danger-btn-deep'
+    );
+
+    // Resume is the same feed action as Start and keeps its emerald ramp.
+    act(() => feedSocket.receive({ type: 'feed_state', data: 'paused' }));
+    expect(screen.getByRole('button', { name: 'Resume' })).toHaveClass(
+      'from-live-btn',
+      'to-live-btn-deep'
+    );
+  });
+  it('keeps the guest QR on a white card with its heavier warm shadow', async () => {
+    await renderConsoleWithStoredSession();
+
+    const qrWhite = screen.getByRole('img', { name: /guest qr code/i }).closest('div');
+    expect(qrWhite).not.toBeNull();
+    expect(qrWhite).toHaveClass('bg-white', 'shadow-qr');
+  });
+  it('renders the console without glass or the retired palette', async () => {
+    const { container } = await renderConsoleWithStoredSession();
+
+    expectNoRetiredStyles(container);
+  });
+
+  it('renders the login card without glass or the retired palette', () => {
+    const { container } = render(<OperatorConsole />);
+
+    expectNoRetiredStyles(container);
   });
 });
 
