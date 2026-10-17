@@ -8,8 +8,14 @@ Pointer: match the Operator Console — including its state gallery — in `docs
 
 **Status:** ready-for-agent
 
-- [ ] Console surfaces restyled with the sand/evergreen theme; no glass or blur
-- [ ] Feed Control buttons: emerald Start/Resume distinct from brand evergreen; Pause/Stop legible; behaviour unchanged
-- [ ] State pill/dot come from the shared module; labels unchanged
-- [ ] QR panel stays white with its heavier shadow; login card and room code restyled
-- [ ] All existing tests, lint, and `tsc -b` build pass
+- [x] Console surfaces restyled with the sand/evergreen theme; no glass or blur
+- [x] Feed Control buttons: emerald Start/Resume distinct from brand evergreen; Pause/Stop legible; behaviour unchanged
+- [x] State pill/dot come from the shared module; labels unchanged
+- [x] QR panel stays white with its heavier shadow; login card and room code restyled
+- [x] All existing tests, lint, and `tsc -b` build pass
+
+## Comments
+
+- Implemented in `23a0720`. Feed Control now runs the state ramp (emerald live-btn Start/Resume, paused Pause, danger Stop — deliberately not the brand btn ramp); pill/dot come from `OPERATOR_STATE_VISUALS`; QR panel keeps plain `bg-white` under `shadow-qr`; login card, room-code chip, Download QR / Log out restyled. Copy, auth, and feed control behaviour untouched; 5 new tests.
+- Verification at merge: 70 tests (65 + 5), lint/build clean.
+- Review fix pass (`173a332`): operator inputs and buttons replaced the ~1.25:1 ring focus cue with the same visible `outline-focus` keyboard treatment as the guest view; feed-button ramps now come from `feedStateVisuals` (single owner).

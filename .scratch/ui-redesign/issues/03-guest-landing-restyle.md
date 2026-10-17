@@ -8,8 +8,14 @@ Pointer: the settled look for this view is in the export at `docs/ui-redesign-vi
 
 **Status:** ready-for-agent
 
-- [ ] Picker styled with the theme's sand surfaces and borders; no `backdrop-filter` remains
-- [ ] Brand mark in the serif face; language buttons on the primary-button treatment and clearly tappable
-- [ ] Pre-feed notice and error states restyled and legible against their surfaces; copy unchanged
-- [ ] Focus states visible; keyboard navigation unchanged
-- [ ] All existing tests, lint, and `tsc -b` build pass
+- [x] Picker styled with the theme's sand surfaces and borders; no `backdrop-filter` remains
+- [x] Brand mark in the serif face; language buttons on the primary-button treatment and clearly tappable
+- [x] Pre-feed notice and error states restyled and legible against their surfaces; copy unchanged
+- [x] Focus states visible; keyboard navigation unchanged
+- [x] All existing tests, lint, and `tsc -b` build pass
+
+## Comments
+
+- Implemented in `134abed`: sand-card surface with 1px line border, serif 絆 KIZUNA mark over the gradient seam, three language buttons on the btn ramp with visible focus outlines, noticed/error states on the paused/danger families. Three new tests: retired-styles scan (no glass/palette drift), Tab+Enter activation, error-state rendering.
+- Verification at merge: 56 tests (53 + 3), lint/build clean.
+- Review fix pass (`173a332`) extracted the shared `BrandMark` component (previously duplicated in this view and the console, already drifted 32 vs 34px) and moved the focus outline onto the token-owned `outline-focus` treatment.

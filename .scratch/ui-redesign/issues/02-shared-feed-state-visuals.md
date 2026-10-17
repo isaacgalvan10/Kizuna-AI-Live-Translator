@@ -6,8 +6,14 @@
 
 **Status:** ready-for-agent
 
-- [ ] Module exposes label + pill + dot presentation for every state either view can render (Waiting, Live, Paused, Ended, Stopped)
-- [ ] The Ended/Stopped label difference is explicit data in the module
-- [ ] Unit test: every entry complete and non-empty; labels match the strings the views use today
-- [ ] Styling references theme utilities only (no literal colour values)
-- [ ] All existing tests, lint, and `tsc -b` build pass
+- [x] Module exposes label + pill + dot presentation for every state either view can render (Waiting, Live, Paused, Ended, Stopped)
+- [x] The Ended/Stopped label difference is explicit data in the module
+- [x] Unit test: every entry complete and non-empty; labels match the strings the views use today
+- [x] Styling references theme utilities only (no literal colour values)
+- [x] All existing tests, lint, and `tsc -b` build pass
+
+## Comments
+
+- Implemented in `69cea77`. `frontend/src/feedStateVisuals.ts` exports `LISTENER_STATE_VISUALS` and `OPERATOR_STATE_VISUALS` (labels Waiting/Live/Paused/Ended and Live/Paused/Stopped) from one shared presentation record; the Ended/Stopped difference is per-view label data. Guard test rejects literal colours and non-state utility classes.
+- Verification at merge: 62 tests (53 + 9 new), lint/build clean.
+- Review fix pass (`173a332`) followed the prototype by giving Waiting its own muted `waiting` family (no longer visually identical to Ended) and moved the per-state feed-button ramp mapping into this module so the console and the contrast test share one owner.
