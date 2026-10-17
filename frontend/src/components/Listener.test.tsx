@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Listener from './Listener';
+import { LISTENER_STATE_VISUALS } from '../feedStateVisuals';
+import type { ListenerState } from '../feedStateVisuals';
 
 class FakeWebSocket {
   static instances: FakeWebSocket[] = [];
@@ -370,6 +372,126 @@ describe('reading a previous line', () => {
       })
     );
     expect(scroll.scrollTop).toBe(1000);
+  });
+});
+
+// The redesign's guard rails, not its look: jsdom has no CSS engine, so the
+// restyle is pinned by what must be absent (glass, the retired palette) and by
+// what the settled design promises (serif reading lines, a motion-safe pulse).
+const RETIRED_STYLES = /backdrop|indigo|slate|violet|emerald-\d|amber-\d|bg-white/;
+const SERIF_READING_LINE = /font-serif/;
+const READING_SIZE_OR_LARGER = /text-(?:lg|xl|2xl|3xl)|text-\[(?:1[89]|[2-9]\d)px\]/;
+const READING_MEASURE = /max-w-\[\d+(?:\.\d+)?em\]/;
+const BOXED_LINE = /rounded-|shadow-/;
+
+function expectNoRetiredStyles(container: HTMLElement) {
+  for (const element of container.querySelectorAll<HTMLElement>('[class]')) {
+    // SVG elements expose className as an SVGAnimatedString, so read the attribute.
+    const className = element.getAttribute('class') ?? '';
+    expect(
+      className,
+      `${element.tagName.toLowerCase()} still wears a retired style: ${className}`
+    ).not.toMatch(RETIRED_STYLES);
+  }
+}
+
+function expectClasses(element: HTMLElement, classes: string) {
+  for (const className of classes.split(/\s+/)) {
+    expect(
+      element.className.split(/\s+/),
+      `${element.tagName.toLowerCase()} is missing ${className}`
+    ).toContain(className);
+  }
+}
+
+describe('the Kizuna restyle', () => {
+  it('renders the waiting view without glass or the retired palette', () => {
+    const { container } = renderListener('/listen/3/en');
+
+    expect(screen.getByText(/waiting for operator/i)).toBeInTheDocument();
+    expectNoRetiredStyles(container);
+  });
+
+  it('renders lines, the interim line and the state banners without glass or the retired palette', () => {
+    const { container } = renderListener('/listen/3/en', { isLive: true });
+    const socket = FakeWebSocket.find('/ws/listen/3/en');
+
+    act(() =>
+      socket.receive({
+        type: 'live_translation',
+        data: { original: '神は愛です。', translation: 'God is love.' },
+      })
+    );
+    act(() =>
+      socket.receive({
+        type: 'interim_translation',
+        data: { original: '神は語って', translation: 'God is speaking' },
+      })
+    );
+    expectNoRetiredStyles(container);
+
+    act(() => socket.receive({ type: 'feed_state', data: 'paused' }));
+    expect(screen.getByText(/paused — worship music/i)).toBeInTheDocument();
+    expectNoRetiredStyles(container);
+
+    act(() => socket.receive({ type: 'feed_state', data: 'stopped' }));
+    expect(screen.getByText(/service ended/i)).toBeInTheDocument();
+    expectNoRetiredStyles(container);
+  });
+
+  it('sets both panels as flowing serif text at reading size with a reading measure, not per-line boxes', () => {
+    renderListener('/listen/3/en', { isLive: true });
+
+    act(() =>
+      FakeWebSocket.find('/ws/listen/3/en').receive({
+        type: 'live_translation',
+        data: { original: '神は愛です。', translation: 'God is love.' },
+      })
+    );
+
+    for (const line of [screen.getByText('God is love.'), screen.getByText('神は愛です。')]) {
+      expect(line.className).toMatch(SERIF_READING_LINE);
+      expect(line.className).toMatch(READING_SIZE_OR_LARGER);
+      expect(line.className).toMatch(READING_MEASURE);
+      expect(line.className).not.toMatch(BOXED_LINE);
+    }
+  });
+
+  it('breathes the interim line only with motion-safe, and keeps it distinct', () => {
+    renderListener('/listen/3/en', { isLive: true });
+
+    act(() =>
+      FakeWebSocket.find('/ws/listen/3/en').receive({
+        type: 'interim_translation',
+        data: { original: '神は語って', translation: 'God is speaking' },
+      })
+    );
+
+    const interim = screen.getByText('God is speaking');
+    expect(interim.className).toMatch(/motion-safe:animate-pulse/);
+    expect(interim.className).toMatch(/italic/);
+    expect(interim.className).toMatch(/border-brand-|bg-brand-/);
+  });
+
+  it('renders every feed state from the shared state visuals with its label', () => {
+    renderListener('/listen/3/en', { isLive: false });
+    const socket = FakeWebSocket.find('/ws/listen/3/en');
+
+    const checkState = (state: ListenerState) => {
+      const visuals = LISTENER_STATE_VISUALS[state];
+      const pill = screen.getByRole('status');
+      expect(pill).toHaveTextContent(visuals.label);
+      expectClasses(pill, visuals.pill);
+      expectClasses(pill.querySelector('span') as HTMLElement, visuals.dot);
+    };
+
+    checkState('waiting');
+    act(() => socket.receive({ type: 'feed_state', data: 'live' }));
+    checkState('live');
+    act(() => socket.receive({ type: 'feed_state', data: 'paused' }));
+    checkState('paused');
+    act(() => socket.receive({ type: 'feed_state', data: 'stopped' }));
+    checkState('stopped');
   });
 });
 
