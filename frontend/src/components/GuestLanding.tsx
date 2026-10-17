@@ -24,7 +24,7 @@ const SEAM =
   'mx-auto mt-2.5 h-px w-16 bg-linear-to-r from-transparent via-brand/85 to-transparent';
 const EYEBROW = 'text-[11px] font-bold uppercase tracking-[0.18em] text-dim';
 const LANGUAGE_BUTTON =
-  'w-full cursor-pointer rounded-2xl border border-btn-border bg-linear-to-b from-btn to-btn-deep py-[17px] text-[19px] font-extrabold tracking-[0.02em] text-btn-ink transition-[filter] duration-150 hover:brightness-[1.08] active:brightness-[0.94] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand/55';
+  'w-full cursor-pointer rounded-2xl border border-btn-border bg-linear-to-b from-btn to-btn-deep py-[17px] text-[19px] font-extrabold tracking-[0.02em] text-btn-ink transition-[filter] duration-150 hover:brightness-[1.08] active:brightness-[0.94] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand/70';
 
 export default function GuestLanding() {
   const navigate = useNavigate();

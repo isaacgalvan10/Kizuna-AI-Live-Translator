@@ -22,7 +22,7 @@
   /* Text hierarchy */
   --color-ink: #1E3B2C;
   --color-body: #4C4A36;
-  --color-dim: #6E6B52;
+  --color-dim: #6B684F;
   --color-mute: #8C8869;
   --color-read: #3E3A28;
 
@@ -45,17 +45,17 @@
      ink (text), soft (translucent fill), line (translucent border) and a
      solid base for dots and state buttons. */
   --color-live: #10B981;
-  --color-live-ink: #07714B;
+  --color-live-ink: #066A46;
   --color-live-soft: rgba(16, 180, 120, 0.15);
   --color-live-line: rgba(10, 160, 105, 0.42);
-  --color-live-btn: #14B380;
+  --color-live-btn: #149372;
   --color-live-btn-deep: #0B8A5F;
 
   --color-paused: #D9880A;
-  --color-paused-ink: #8A5A06;
+  --color-paused-ink: #825405;
   --color-paused-soft: rgba(217, 136, 10, 0.14);
   --color-paused-line: rgba(217, 136, 10, 0.38);
-  --color-paused-btn: #E0911C;
+  --color-paused-btn: #BD7509;
   --color-paused-btn-deep: #BA6E09;
 
   --color-danger: #E0486B;
@@ -66,7 +66,7 @@
   --color-danger-btn-deep: #BE123C;
 
   --color-stopped: #9A9078;
-  --color-stopped-ink: #7A7260;
+  --color-stopped-ink: #655E4E;
   --color-stopped-soft: rgba(120, 110, 85, 0.1);
   --color-stopped-line: rgba(120, 110, 85, 0.26);
 
