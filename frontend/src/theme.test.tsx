@@ -137,6 +137,20 @@ describe('the document shell loads the Kizuna webfonts', () => {
   });
 });
 
+describe('the document is pinned to the settled light theme', () => {
+  it('opts out of browser auto-dark with an only-light meta tag', () => {
+    expect(html).toMatch(/<meta name="color-scheme" content="only light"\s*\/?>/);
+  });
+
+  it('declares color-scheme: only light on the root', () => {
+    expect(css).toMatch(/color-scheme:\s*only light;/);
+  });
+
+  it('tints the phone browser chrome with the sand base', () => {
+    expect(html).toMatch(/<meta name="theme-color" content="#F0E7D0"\s*\/?>/i);
+  });
+});
+
 describe('the app shell', () => {
   it('renders one static background wash instead of blur blobs', () => {
     const { container } = render(
