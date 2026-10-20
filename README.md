@@ -6,7 +6,7 @@ Real-time Japanese→EN/KO/ZH sermon translation. See `docs/church-live-translat
 
 Everything is served from **one origin** (`:5173`): Vite proxies `/api` and `/ws` to the backend container, so phones on your LAN use the app without any extra configuration.
 
-**Prerequisites:** Docker Desktop running. A `.env` next to `docker-compose.yml` with at least `GEMINI_API_KEY` and `JWT_SECRET_KEY` (`POSTGRES_*` are optional; defaults are `user`/`password`/`kizuna_db`).
+**Prerequisites:** Docker Desktop running. A `.env` next to `docker-compose.yml` with at least `GEMINI_API_KEY` and `JWT_SECRET_KEY` (`POSTGRES_*` are optional; defaults are `user`/`password`/`kizuna_db`). Optional backend settings: `GEMINI_MODEL` (default `gemini-3.8-flash`), `LOG_LEVEL` (default `INFO`), and `KIZUNA_DEBUG_DIAGNOSTICS=true` for opt-in audio-level diagnostics. Logs never include sermon text.
 
 ```bash
 # First time after schema changes (e.g. the User.church_id column added in
@@ -17,12 +17,18 @@ docker compose down -v
 docker compose up --build
 ```
 
-Then seed a test church + operator (idempotent):
+Then onboard a church and operator (idempotent). This is the same command used in production:
 
 ```bash
-curl -X POST http://localhost:8000/api/dev/seed
-# operator: operator@kizuna.test / kizuna-operator-test, QR hash: test-hash-123
+docker compose exec backend python -m app.seed_church \
+  --church-name "Kizuna Test Church" \
+  --email operator@kizuna.test \
+  --public-origin http://localhost:5173
 ```
+
+The command prompts for a password only when one is needed. Use `--password-stdin` for automation, `--generate-password` to create one, and `--reset-password` to rotate an existing operator password. It prints the guest join URL and the operator URL.
+
+For local development only, `curl -X POST http://localhost:8000/api/dev/seed` still creates `operator@kizuna.test / kizuna-operator-test` with QR hash `test-hash-123`.
 
 **Test the full flow:**
 

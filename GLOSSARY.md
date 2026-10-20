@@ -78,6 +78,28 @@ _Avoid_: Original, source text, caption
 The sermon text in a guest's language.
 _Avoid_: Output, rendition
 
+### Translation
+
+**Language Channel**:
+One language's stream within a live feed. Every listener of the same language shares it and receives the same translation.
+_Avoid_: Language room, language feed
+
+**Active Language Channel**:
+A language channel with at least one listener. Only active channels are translated.
+_Avoid_: Live language, empty room
+
+**Transcript Timeline**:
+The ordered Japanese transcript of the current live feed, shared across language channels and used to bring late listeners up to date.
+_Avoid_: History buffer, transcript log
+
+**Backfill**:
+The act of translating recent transcript timeline lines into a newly active language channel.
+_Avoid_: History sync, catch-up
+
+**Church Glossary**:
+A church's list of names, recurring terms, preferred style, and Scripture translations used to keep wording consistent.
+_Avoid_: Glossary, dictionary, terminology list
+
 ### Guest Phone
 
 **Language Picker**:

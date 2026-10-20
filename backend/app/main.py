@@ -1,4 +1,7 @@
 import asyncio
+import logging
+import os
+
 from fastapi import (
     Depends,
     FastAPI,
@@ -41,6 +44,11 @@ from .schemas import (
     RoomSummary,
 )
 from .gemini_worker import GeminiWorker
+
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
 
 # Active workers dictionary
 active_gemini_workers: dict[str, GeminiWorker] = {}
