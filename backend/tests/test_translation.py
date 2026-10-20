@@ -139,6 +139,20 @@ def test_prompt_includes_recent_context():
     assert "もう一つの文。" in prompt
 
 
+def test_prompt_warns_that_the_audio_overlap_must_not_be_repeated():
+    prompt = build_prompt(["en"], context_lines=["前の文。"])
+
+    assert "overlap" in prompt.lower()
+    assert "do not repeat" in prompt.lower()
+
+
+def test_prompt_keeps_terminology_consistent_with_recent_context():
+    prompt = build_prompt(["en"], context_lines=["前の文。"])
+
+    assert "RECENT CONTEXT" in prompt
+    assert "consistent" in prompt.lower()
+
+
 def test_response_schema_has_only_requested_translations():
     schema = build_response_schema(["en", "zh-hans"])
     translations = schema["properties"]["translations"]

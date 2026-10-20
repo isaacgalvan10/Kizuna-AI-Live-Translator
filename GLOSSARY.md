@@ -92,6 +92,14 @@ _Avoid_: Live language, empty room
 The ordered Japanese transcript of the current live feed, shared across language channels and used to bring late listeners up to date.
 _Avoid_: History buffer, transcript log
 
+**Rolling Context**:
+The last one or two Japanese Transcript lines sent with each audio chunk so consecutive translations stay coherent.
+_Avoid_: History prompt, memory
+
+**Audio Overlap**:
+A short repeat of the previous audio chunk's tail at the start of the next chunk, protecting the first word after a pause. The repeated text is deduplicated before listeners see it.
+_Avoid_: Crossfade, buffer overlap
+
 **Backfill**:
 The act of translating recent transcript timeline lines into a newly active language channel.
 _Avoid_: History sync, catch-up

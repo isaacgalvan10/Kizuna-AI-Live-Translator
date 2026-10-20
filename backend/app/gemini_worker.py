@@ -1,18 +1,21 @@
 import asyncio
 import logging
 import os
+from collections import deque
 
 import httpx
 
+from app.audio_chunking import AudioChunker, AudioSegment
 from app.socket_manager import manager
 
 from .gemini_translation import GeminiTranslator, TranslationError
 from .translation_prompt import supported_languages
+from .transcript_text import dedupe_overlap
 
 logger = logging.getLogger(__name__)
 
-MIN_BUFFER_BYTES = int(32000 * 1.5)
-MAX_BUFFER_BYTES = int(32000 * 5.0)
+FLUSH_INTERVAL_SECONDS = 0.2
+CONTEXT_LINES = 2
 
 
 def _debug_diagnostics_enabled() -> bool:
@@ -34,11 +37,11 @@ class GeminiWorker:
         socket_manager=None,
         debug_diagnostics: bool | None = None,
         start_flusher: bool = True,
+        chunker: AudioChunker | None = None,
     ):
         self.room_id = room_id
         self.loop = loop
-        self.audio_buffer = bytearray()
-        self.buffer_lock = asyncio.Lock()
+        self.chunker = chunker or AudioChunker()
         self.translator = translator or GeminiTranslator()
         self.manager = socket_manager or manager
         self.debug_diagnostics = (
@@ -46,6 +49,9 @@ class GeminiWorker:
             if debug_diagnostics is None
             else debug_diagnostics
         )
+        self._context_lines: deque[str] = deque(maxlen=CONTEXT_LINES)
+        self._last_translations: dict[str, str] = {}
+        self._flush_lock = asyncio.Lock()
         self.is_running = True
         self.flusher_task = (
             self.loop.create_task(self._audio_flusher_loop())
@@ -54,12 +60,12 @@ class GeminiWorker:
         )
 
     def process_audio_chunk(self, chunk: bytes):
-        self.audio_buffer.extend(chunk)
+        self.chunker.feed(chunk)
 
     async def _audio_flusher_loop(self):
         while self.is_running:
             try:
-                await asyncio.sleep(3.0)
+                await asyncio.sleep(FLUSH_INTERVAL_SECONDS)
                 await self._flush_once()
             except asyncio.CancelledError:
                 raise
@@ -71,35 +77,55 @@ class GeminiWorker:
                 await asyncio.sleep(1.0)
 
     async def _flush_once(self) -> None:
-        active_langs = supported_languages(
-            self.manager.get_active_languages(self.room_id)
-        )
-        async with self.buffer_lock:
+        async with self._flush_lock:
+            active_langs = supported_languages(
+                self.manager.get_active_languages(self.room_id)
+            )
             if not active_langs:
-                self.audio_buffer.clear()
+                self.chunker.clear()
+                self._last_translations.clear()
                 return
-            if len(self.audio_buffer) < MIN_BUFFER_BYTES:
-                return
-            chunk_size = min(len(self.audio_buffer), MAX_BUFFER_BYTES)
-            raw_pcm = bytes(self.audio_buffer[:chunk_size])
-            del self.audio_buffer[:chunk_size]
 
+            segment = self.chunker.pop_ready()
+            if segment is None:
+                return
+            if not self.chunker.contains_new_speech(segment):
+                logger.debug(
+                    "gemini_skip_silence room_id=%s bytes=%d",
+                    self.room_id,
+                    len(segment.pcm),
+                )
+                return
+
+            await self._translate_segment(segment, active_langs)
+
+    async def _translate_segment(
+        self,
+        segment: AudioSegment,
+        active_langs: tuple[str, ...],
+    ) -> None:
         logger.debug(
-            "gemini_flush room_id=%s bytes=%d languages=%s",
+            "gemini_flush room_id=%s bytes=%d overlap_bytes=%d languages=%s",
             self.room_id,
-            chunk_size,
+            len(segment.pcm),
+            segment.overlap_bytes,
             ",".join(active_langs),
         )
         if self.debug_diagnostics:
             logger.info(
                 "gemini_debug_audio room_id=%s bytes=%d non_zero=%d",
                 self.room_id,
-                len(raw_pcm),
-                sum(1 for byte in raw_pcm if byte != 0),
+                len(segment.pcm),
+                sum(1 for byte in segment.pcm if byte != 0),
             )
 
+        context_lines = tuple(self._context_lines)
         try:
-            result = await self.translator.translate(raw_pcm, active_langs)
+            result = await self.translator.translate(
+                segment.pcm,
+                active_langs,
+                context_lines=context_lines,
+            )
         except TranslationError as exc:
             logger.warning(
                 "gemini_translation_failed room_id=%s error=%s",
@@ -128,23 +154,28 @@ class GeminiWorker:
             )
             return
 
-        if not result.japanese or len(result.japanese) <= 1:
+        previous_japanese = context_lines[-1] if context_lines else ""
+        japanese = dedupe_overlap(previous_japanese, result.japanese)
+        if not japanese or len(japanese) <= 1:
             return
 
         logger.info(
             "gemini_translated room_id=%s japanese_chars=%d languages=%s",
             self.room_id,
-            len(result.japanese),
+            len(japanese),
             ",".join(active_langs),
         )
 
         for code in active_langs:
-            translated_text = result.translations.get(code, "")
+            translated_text = dedupe_overlap(
+                self._last_translations.get(code, ""),
+                result.translations.get(code, ""),
+            )
             if not translated_text:
                 continue
             try:
                 await self.manager.broadcast_to_language(
-                    result.japanese,
+                    japanese,
                     translated_text,
                     self.room_id,
                     code,
@@ -155,6 +186,10 @@ class GeminiWorker:
                     self.room_id,
                     code,
                 )
+            else:
+                self._last_translations[code] = translated_text
+
+        self._context_lines.append(japanese)
 
     def start(self):
         logger.info("gemini_worker_started room_id=%s", self.room_id)

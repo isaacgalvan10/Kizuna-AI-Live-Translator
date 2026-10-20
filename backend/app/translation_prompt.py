@@ -48,9 +48,13 @@ def build_prompt(
     cleaned_context = [line.strip() for line in context_lines if line.strip()]
     if cleaned_context:
         context_section = (
-            "\nRECENT CONTEXT (for continuity only; do not translate again)\n"
+            "\nRECENT CONTEXT (already translated; use it for continuity "
+            "and terminology)\n"
             + "\n".join(f"- {line}" for line in cleaned_context)
             + "\n"
+            + "The audio may begin with a short overlap that repeats the end "
+            "of this context. Do not repeat any text that is already covered "
+            "above; start from the new speech.\n"
         )
 
     return f"""You are an expert real-time interpreter for a Japanese Christian church sermon.
@@ -73,7 +77,7 @@ TRANSLATION STYLE
 - Simplified Chinese: Protestant terminology, faithful and pastoral. Use 和合本 wording for direct Scripture quotations.
 - Traditional Chinese: Protestant terminology, faithful and pastoral. Use 和合本 wording for direct Scripture quotations.
 - The source Bible text is 新共同訳. When the speaker quotes Scripture directly, use the target-language version above. When the speaker paraphrases, translate the paraphrase; do not substitute a different verse.
-- Keep names and recurring terms consistent within the chunk.
+- Keep names and recurring terms consistent across the sermon, following the RECENT CONTEXT wording.
 {context_section}
 TARGET LANGUAGES
 {language_list}
