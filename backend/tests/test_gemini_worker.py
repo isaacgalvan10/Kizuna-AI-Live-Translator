@@ -18,9 +18,13 @@ class FakeManager:
         self.languages = languages
         self.broadcast_errors = broadcast_errors or {}
         self.broadcasts = []
+        self.transcripts = []
 
     def get_active_languages(self, room_id):
         return self.languages
+
+    def record_transcript(self, room_id, japanese):
+        self.transcripts.append((room_id, japanese))
 
     async def broadcast_to_language(
         self,
@@ -114,6 +118,29 @@ async def test_worker_flushes_once_and_broadcasts_to_each_language():
     assert context == ()
     assert [item[3] for item in manager.broadcasts] == ["en", "ko"]
     assert worker.chunker.pending_new_bytes == int(32000 * 0.35)
+
+
+async def test_worker_records_one_shared_transcript_line_per_chunk():
+    manager = FakeManager(["en", "ko"])
+    translator = FakeTranslator()
+    worker = make_worker(manager, translator)
+    worker.process_audio_chunk(audio_chunk())
+
+    await worker._flush_once()
+
+    assert manager.transcripts == [("room-1", "神は愛です。")]
+
+
+async def test_worker_records_no_transcript_without_listeners():
+    manager = FakeManager([])
+    translator = FakeTranslator()
+    worker = make_worker(manager, translator)
+    worker.process_audio_chunk(audio_chunk())
+
+    await worker._flush_once()
+
+    assert translator.calls == []
+    assert manager.transcripts == []
 
 
 async def test_worker_does_not_requeue_after_a_broadcast_failure():

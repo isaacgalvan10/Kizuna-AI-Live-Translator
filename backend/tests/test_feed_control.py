@@ -28,11 +28,9 @@ def sent_feed_states(websocket: FakeWebSocket) -> list[str]:
 
 @pytest.fixture(autouse=True)
 def clean_socket_manager():
-    manager.active_connections.clear()
-    manager.history_buffer.clear()
+    manager.reset()
     yield
-    manager.active_connections.clear()
-    manager.history_buffer.clear()
+    manager.reset()
 
 
 @pytest.fixture
@@ -189,6 +187,57 @@ async def test_pause_broadcasts_paused_to_listeners(client, room, auth_headers):
     await client.post(f"/api/operator/rooms/{room.id}/pause", headers=headers)
 
     assert sent_feed_states(listener) == ["paused"]
+
+
+async def test_a_fresh_start_clears_the_previous_feed_history(
+    client, room, auth_headers
+):
+    listener = FakeWebSocket()
+    await manager.connect(listener, str(room.id), "en")
+    manager.record_transcript(str(room.id), "前の礼拝。")
+    await manager.broadcast_to_language(
+        "前の礼拝。",
+        "Last service.",
+        str(room.id),
+        "en",
+    )
+    listener.sent.clear()
+
+    headers = await auth_headers()
+    await client.post(f"/api/operator/rooms/{room.id}/start", headers=headers)
+
+    assert [message["type"] for message in map(json.loads, listener.sent)] == [
+        "history",
+        "feed_state",
+    ]
+    assert listener.sent[0] == json.dumps({"type": "history", "data": []})
+    assert manager.timeline.get(str(room.id)) is None
+
+
+async def test_resuming_after_pause_keeps_the_feed_history(
+    client, room, auth_headers
+):
+    headers = await auth_headers()
+    await client.post(f"/api/operator/rooms/{room.id}/start", headers=headers)
+
+    listener = FakeWebSocket()
+    await manager.connect(listener, str(room.id), "en")
+    manager.record_transcript(str(room.id), "続きの礼拝。")
+    await manager.broadcast_to_language(
+        "続きの礼拝。",
+        "The service continues.",
+        str(room.id),
+        "en",
+    )
+    await client.post(f"/api/operator/rooms/{room.id}/pause", headers=headers)
+
+    listener.sent.clear()
+    await client.post(f"/api/operator/rooms/{room.id}/start", headers=headers)
+
+    assert [json.loads(raw) for raw in listener.sent] == [
+        {"type": "feed_state", "data": "live"},
+    ]
+    assert manager.timeline.get(str(room.id)) is not None
 
 
 async def test_start_after_pause_resumes_the_feed(client, room, auth_headers):

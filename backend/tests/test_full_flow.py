@@ -10,6 +10,7 @@ own event loop, so the database is a temp *file* SQLite database.
 
 import asyncio
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -57,6 +58,7 @@ class FakeGeminiWorker:
         pass
 
     def process_audio_chunk(self, chunk: bytes):
+        manager.record_transcript(self.room_id, CANNED_TRANSCRIPT)
         for code in manager.get_active_languages(self.room_id):
             translation = CANNED_TRANSLATIONS.get(code)
             if translation is None:
@@ -66,6 +68,23 @@ class FakeGeminiWorker:
                     CANNED_TRANSCRIPT, translation, self.room_id, code
                 )
             )
+
+
+class FakeBackfillTranslator:
+    def __init__(self):
+        self.calls = []
+
+    async def translate_lines(self, lines, active_languages, *, glossary=None):
+        self.calls.append((tuple(lines), tuple(active_languages), glossary))
+        return SimpleNamespace(
+            translations={
+                code: [
+                    CANNED_TRANSLATIONS[code]
+                    for _ in lines
+                ]
+                for code in active_languages
+            }
+        )
 
 
 def seed_churches(db_path: Path) -> dict:
@@ -124,12 +143,14 @@ def flow_db(tmp_path, monkeypatch, file_db_override):
     ids = seed_churches(db_path)
     app.dependency_overrides[get_db] = file_db_override(db_path)
     monkeypatch.setattr(main_module, "GeminiWorker", FakeGeminiWorker)
-    manager.active_connections.clear()
-    manager.history_buffer.clear()
+    backfill_translator = FakeBackfillTranslator()
+    manager.backfill_translator = backfill_translator
+    manager.reset()
+    ids["backfill_translator"] = backfill_translator
     yield ids
     app.dependency_overrides.clear()
-    manager.active_connections.clear()
-    manager.history_buffer.clear()
+    manager.reset()
+    manager.backfill_translator = None
 
 
 def operator_token(client: TestClient, email: str, password: str) -> str:
@@ -170,6 +191,97 @@ def test_guest_who_scans_before_start_waits_and_then_follows_the_feed(flow_db):
                         "translation": CANNED_TRANSLATIONS["en"],
                     },
                 }
+
+
+def test_late_and_new_language_listeners_receive_history(flow_db):
+    with TestClient(app) as client:
+        token = operator_token(client, FIRST_EMAIL, FIRST_PASSWORD)
+        room = flow_db["first_room"]
+
+        with client.websocket_connect(f"/ws/listen/{room}/en") as listener:
+            with client.websocket_connect(
+                f"/ws/stream/{room}?token={token}"
+            ) as stream:
+                client.post(
+                    f"/api/operator/rooms/{room}/start",
+                    headers=auth(token),
+                )
+                assert listener.receive_json() == {
+                    "type": "feed_state",
+                    "data": "live",
+                }
+
+                stream.send_bytes(b"\x00\x01" * 480)
+                assert listener.receive_json() == {
+                    "type": "live_translation",
+                    "data": {
+                        "original": CANNED_TRANSCRIPT,
+                        "translation": CANNED_TRANSLATIONS["en"],
+                    },
+                }
+
+                with client.websocket_connect(
+                    f"/ws/listen/{room}/en"
+                ) as late_english_listener:
+                    assert late_english_listener.receive_json() == {
+                        "type": "history",
+                        "data": [
+                            {
+                                "original": CANNED_TRANSCRIPT,
+                                "translation": CANNED_TRANSLATIONS["en"],
+                            }
+                        ],
+                    }
+
+                    with client.websocket_connect(
+                        f"/ws/listen/{room}/ko"
+                    ) as korean_listener:
+                        assert korean_listener.receive_json() == {
+                            "type": "history",
+                            "data": [
+                                {
+                                    "original": CANNED_TRANSCRIPT,
+                                    "translation": CANNED_TRANSLATIONS["ko"],
+                                }
+                            ],
+                        }
+
+    assert flow_db["backfill_translator"].calls == [
+        ((CANNED_TRANSCRIPT,), ("ko",), None)
+    ]
+
+
+def test_a_reconnecting_channel_receives_history_without_backfilling(flow_db):
+    with TestClient(app) as client:
+        token = operator_token(client, FIRST_EMAIL, FIRST_PASSWORD)
+        room = flow_db["first_room"]
+
+        with client.websocket_connect(f"/ws/listen/{room}/en") as listener:
+            with client.websocket_connect(
+                f"/ws/stream/{room}?token={token}"
+            ) as stream:
+                client.post(
+                    f"/api/operator/rooms/{room}/start",
+                    headers=auth(token),
+                )
+                listener.receive_json()
+                stream.send_bytes(b"\x00\x01" * 480)
+                listener.receive_json()
+
+        with client.websocket_connect(
+            f"/ws/listen/{room}/en"
+        ) as reconnected_listener:
+            assert reconnected_listener.receive_json() == {
+                "type": "history",
+                "data": [
+                    {
+                        "original": CANNED_TRANSCRIPT,
+                        "translation": CANNED_TRANSLATIONS["en"],
+                    }
+                ],
+            }
+
+    assert flow_db["backfill_translator"].calls == []
 
 
 def test_pause_resume_and_stop_reach_the_guest(flow_db):

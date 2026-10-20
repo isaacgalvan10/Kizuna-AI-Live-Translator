@@ -86,9 +86,53 @@ app.add_middleware(
 async def health_check():
     return {"status": "healthy", "service": "Kizuna Backend"}
 
+async def _listener_glossary(
+    db: AsyncSession,
+    room_id: str,
+):
+    """Loads a listener's church glossary for late-joiner backfill.
+
+    Backfill is best-effort, so a bad stored glossary must not block a guest
+    from listening: log the location (never the glossary content) and fall
+    back to the built-in defaults.
+    """
+    try:
+        room_pk = int(room_id)
+    except (TypeError, ValueError):
+        return None
+
+    room = (
+        await db.execute(select(Room).where(Room.id == room_pk))
+    ).scalar_one_or_none()
+    if room is None:
+        return None
+
+    try:
+        return await load_church_glossary(db, room.church_id)
+    except ChurchGlossaryError:
+        logger.error(
+            "church_glossary_invalid room_id=%d church_id=%d",
+            room.id,
+            room.church_id,
+        )
+        return None
+
+
 @app.websocket("/ws/listen/{room_id}/{language}")
-async def websocket_endpoint(websocket: WebSocket, room_id: str, language: str):
-    await manager.connect(websocket, room_id, language)
+async def websocket_endpoint(
+    websocket: WebSocket,
+    room_id: str,
+    language: str,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        glossary = await _listener_glossary(db, room_id)
+    finally:
+        # The listener can stay connected for the whole service; do not keep a
+        # pooled database connection open for that time.
+        await db.close()
+
+    await manager.connect(websocket, room_id, language, glossary=glossary)
     try:
         while True:
             # Keep-alive loop for listener clients
@@ -257,9 +301,18 @@ async def _apply_feed_control(
     if room is None:
         raise HTTPException(status_code=404, detail="Room not found")
 
+    # Start is used both to begin a service and to resume after Pause. Only a
+    # start from stopped begins a fresh Live Feed and clears its history.
+    fresh_start = (
+        state == FEED_STATE_LIVE and is_live is True and not room.is_live
+    )
+
     if is_live is not None:
         room.is_live = is_live
         await db.commit()
+
+    if fresh_start:
+        await manager.clear_history(str(room.id))
 
     await manager.broadcast_feed_state(str(room.id), state)
 

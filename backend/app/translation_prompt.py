@@ -99,6 +99,21 @@ def _glossary_section(
     )
 
 
+TRANSLATION_STYLE_RULES = """TRANSLATION STYLE
+- English: fluent, warm, pastoral, and faithful. Use ESV wording for direct Scripture quotations.
+- Korean: formal polite style (존댓말), faithful and pastoral. Use 개역개정 wording for direct Scripture quotations.
+- Simplified Chinese: Protestant terminology, faithful and pastoral. Use 和合本 wording for direct Scripture quotations.
+- Traditional Chinese: Protestant terminology, faithful and pastoral. Use 和合本 wording for direct Scripture quotations.
+- The source Bible text is 新共同訳. When the speaker quotes Scripture directly, use the target-language version above. When the speaker paraphrases, translate the paraphrase; do not substitute a different verse.
+- Keep names and recurring terms consistent across the sermon, following the RECENT CONTEXT wording."""
+
+
+def _language_list(languages: Sequence[str]) -> str:
+    return "\n".join(
+        f'- "{code}": {SUPPORTED_LANGUAGES[code]}' for code in languages
+    )
+
+
 def build_prompt(
     active_languages: Sequence[str],
     *,
@@ -109,9 +124,7 @@ def build_prompt(
     if not languages:
         raise ValueError("At least one supported language is required.")
 
-    language_list = "\n".join(
-        f'- "{code}": {SUPPORTED_LANGUAGES[code]}' for code in languages
-    )
+    language_list = _language_list(languages)
     key_list = ", ".join(f'"{code}"' for code in languages)
     output_example = json.dumps(
         {
@@ -154,13 +167,7 @@ JAPANESE TRANSCRIPT
 - Ignore music, coughing, silence, and other non-speech sounds.
 - If there is no meaningful speech, return empty strings.
 
-TRANSLATION STYLE
-- English: fluent, warm, pastoral, and faithful. Use ESV wording for direct Scripture quotations.
-- Korean: formal polite style (존댓말), faithful and pastoral. Use 개역개정 wording for direct Scripture quotations.
-- Simplified Chinese: Protestant terminology, faithful and pastoral. Use 和合本 wording for direct Scripture quotations.
-- Traditional Chinese: Protestant terminology, faithful and pastoral. Use 和合本 wording for direct Scripture quotations.
-- The source Bible text is 新共同訳. When the speaker quotes Scripture directly, use the target-language version above. When the speaker paraphrases, translate the paraphrase; do not substitute a different verse.
-- Keep names and recurring terms consistent across the sermon, following the RECENT CONTEXT wording.
+{TRANSLATION_STYLE_RULES}
 {context_section}{glossary_section}
 TARGET LANGUAGES
 {language_list}
@@ -170,6 +177,82 @@ Return only a JSON object with this exact shape:
 {output_example}
 
 Use exactly these translation keys: {key_list}. Do not wrap the JSON in markdown."""
+
+
+def build_backfill_prompt(
+    active_languages: Sequence[str],
+    line_count: int,
+    *,
+    glossary: "ChurchGlossary | None" = None,
+) -> str:
+    languages = supported_languages(active_languages)
+    if not languages:
+        raise ValueError("At least one supported language is required.")
+
+    language_list = _language_list(languages)
+    key_list = ", ".join(f'"{code}"' for code in languages)
+    output_example = json.dumps(
+        {
+            "translations": {
+                code: [
+                    f"<{SUPPORTED_LANGUAGES[code]} translation of line 1>",
+                    f"<{SUPPORTED_LANGUAGES[code]} translation of line 2>",
+                ]
+                for code in languages
+            }
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+    glossary_section = _glossary_section(glossary, languages)
+
+    return f"""You are an expert translator for a Japanese Christian church sermon.
+
+TASK
+Translate each of the {line_count} Japanese transcript lines in the user message into every target language listed below.
+The lines are consecutive parts of the same sermon, in order. Translate them faithfully and keep names and recurring terms consistent across all lines.
+Do not merge, split, reorder, add, or omit lines. Return exactly {line_count} translation entries per language.
+Preserve the speaker's meaning. Do not complete an unfinished thought or invent information.
+
+{TRANSLATION_STYLE_RULES}
+{glossary_section}
+TARGET LANGUAGES
+{language_list}
+
+OUTPUT
+Return only a JSON object with this exact shape:
+{output_example}
+
+Each language key must contain an array of exactly {line_count} strings, in the same order as the input lines. Use exactly these translation keys: {key_list}. Do not wrap the JSON in markdown."""
+
+
+def build_backfill_response_schema(active_languages: Sequence[str]) -> dict:
+    languages = supported_languages(active_languages)
+    if not languages:
+        raise ValueError("At least one supported language is required.")
+
+    return {
+        "type": "OBJECT",
+        "properties": {
+            "translations": {
+                "type": "OBJECT",
+                "description": "Translations keyed by language code.",
+                "properties": {
+                    code: {
+                        "type": "ARRAY",
+                        "items": {"type": "STRING"},
+                        "description": (
+                            f"{SUPPORTED_LANGUAGES[code]} translations, "
+                            "one per input line in order."
+                        ),
+                    }
+                    for code in languages
+                },
+                "required": list(languages),
+            },
+        },
+        "required": ["translations"],
+    }
 
 
 def build_response_schema(active_languages: Sequence[str]) -> dict:

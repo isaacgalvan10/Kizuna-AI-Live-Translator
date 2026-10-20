@@ -173,6 +173,8 @@ class GeminiWorker:
             ",".join(active_langs),
         )
 
+        self.manager.record_transcript(self.room_id, japanese)
+
         for code in active_langs:
             translated_text = dedupe_overlap(
                 self._last_translations.get(code, ""),

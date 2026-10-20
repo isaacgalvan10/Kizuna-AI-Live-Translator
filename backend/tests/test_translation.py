@@ -322,6 +322,91 @@ def test_parse_rejects_a_missing_translation():
         )
 
 
+async def test_translator_batch_translates_history_lines_in_one_request():
+    data = {
+        "translations": {
+            "en": ["God is love.", "God is light."],
+        }
+    }
+    translator, client = make_translator(FakeResponse(gemini_response(data)))
+
+    result = await translator.translate_lines(
+        ["神は愛です。", "神は光です。"],
+        ["en"],
+    )
+
+    assert len(client.calls) == 1
+    call = client.calls[0]
+    assert "test-key" not in call["url"]
+    assert call["headers"] == {"x-goog-api-key": "test-key"}
+    assert call["timeout"] == REQUEST_TIMEOUT_SECONDS
+
+    payload = call["json"]
+    system_prompt = payload["systemInstruction"]["parts"][0]["text"]
+    assert "2 Japanese transcript lines" in system_prompt
+    assert '- "en": English' in system_prompt
+    assert json.loads(payload["contents"][0]["parts"][0]["text"]) == {
+        "lines": ["神は愛です。", "神は光です。"]
+    }
+    schema = payload["generationConfig"]["responseSchema"]
+    assert schema["properties"]["translations"]["properties"]["en"]["type"] == (
+        "ARRAY"
+    )
+
+    assert result.translations == {
+        "en": ["God is love.", "God is light."],
+    }
+
+
+async def test_translator_rejects_the_wrong_number_of_backfill_lines():
+    translator, _ = make_translator(
+        FakeResponse(
+            gemini_response(
+                {"translations": {"en": ["Only one line."]}}
+            )
+        )
+    )
+
+    with pytest.raises(TranslationResponseError, match="wrong number"):
+        await translator.translate_lines(
+            ["神は愛です。", "神は光です。"],
+            ["en"],
+        )
+
+
+async def test_translator_injects_the_glossary_into_a_backfill_request():
+    translator, client = make_translator(
+        FakeResponse(
+            gemini_response(
+                {"translations": {"en": ["Pastor Yamada spoke."]}}
+            )
+        )
+    )
+    glossary = sample_glossary()
+
+    await translator.translate_lines(
+        ["山田牧師が話しました。"],
+        ["en"],
+        glossary=glossary,
+    )
+
+    prompt = client.calls[0]["json"]["systemInstruction"]["parts"][0]["text"]
+    assert "CHURCH GLOSSARY" in prompt
+    assert "山田牧師" in prompt
+    assert "Pastor Yamada" in prompt
+
+
+async def test_translator_skips_http_when_there_are_no_backfill_lines():
+    translator, client = make_translator(
+        FakeResponse(gemini_response({"translations": {"en": []}}))
+    )
+
+    result = await translator.translate_lines([], ["en"])
+
+    assert client.calls == []
+    assert result.translations == {"en": []}
+
+
 async def test_translator_makes_one_request_for_all_active_languages():
     data = {
         "japanese": "神は愛です。",

@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING
 import httpx
 
 from .translation_prompt import (
+    build_backfill_prompt,
+    build_backfill_response_schema,
     build_prompt,
     build_response_schema,
     supported_languages,
@@ -71,6 +73,12 @@ class TranslationResult:
     usage: GeminiUsage | None = None
 
 
+@dataclass(frozen=True)
+class BackfillResult:
+    translations: dict[str, list[str]]
+    usage: GeminiUsage | None = None
+
+
 def normalize_model(model: str | None) -> str:
     value = (model or os.getenv("GEMINI_MODEL") or DEFAULT_MODEL).strip()
     if value.startswith("models/"):
@@ -100,19 +108,36 @@ def pcm_to_wav(
     return wav_io.getvalue()
 
 
-def build_generation_config(
-    active_languages: Sequence[str],
-    model: str,
-) -> dict:
+def _build_generation_config(response_schema: dict, model: str) -> dict:
     config = {
         "temperature": 0.1,
         "maxOutputTokens": MAX_OUTPUT_TOKENS,
         "responseMimeType": "application/json",
-        "responseSchema": build_response_schema(active_languages),
+        "responseSchema": response_schema,
     }
     if normalize_model(model).startswith("gemini-3"):
         config["thinkingConfig"] = {"thinkingLevel": "LOW"}
     return config
+
+
+def build_generation_config(
+    active_languages: Sequence[str],
+    model: str,
+) -> dict:
+    return _build_generation_config(
+        build_response_schema(active_languages),
+        model,
+    )
+
+
+def build_backfill_generation_config(
+    active_languages: Sequence[str],
+    model: str,
+) -> dict:
+    return _build_generation_config(
+        build_backfill_response_schema(active_languages),
+        model,
+    )
 
 
 def build_request_payload(
@@ -157,6 +182,47 @@ def build_request_payload(
             }
         ],
         "generationConfig": build_generation_config(languages, model),
+    }
+
+
+def build_backfill_request_payload(
+    lines: Sequence[str],
+    active_languages: Sequence[str],
+    *,
+    glossary: "ChurchGlossary | None" = None,
+    model: str = DEFAULT_MODEL,
+) -> dict:
+    languages = _require_languages(active_languages)
+    cleaned_lines = [line.strip() for line in lines if line.strip()]
+
+    return {
+        "systemInstruction": {
+            "parts": [
+                {
+                    "text": build_backfill_prompt(
+                        languages,
+                        len(cleaned_lines),
+                        glossary=glossary,
+                    )
+                }
+            ]
+        },
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": json.dumps(
+                            {"lines": cleaned_lines},
+                            ensure_ascii=False,
+                        )
+                    }
+                ]
+            }
+        ],
+        "generationConfig": build_backfill_generation_config(
+            languages,
+            model,
+        ),
     }
 
 
@@ -227,6 +293,44 @@ def parse_translation_response(
         japanese=japanese.strip(),
         translations=parsed_translations,
     )
+
+
+def parse_backfill_response(
+    raw_text: str,
+    active_languages: Sequence[str],
+    expected_count: int,
+) -> BackfillResult:
+    languages = _require_languages(active_languages)
+
+    try:
+        data = json.loads(raw_text)
+    except json.JSONDecodeError as exc:
+        raise TranslationResponseError("Gemini returned invalid JSON.") from exc
+    if not isinstance(data, dict):
+        raise TranslationResponseError(
+            "Gemini returned JSON that is not an object."
+        )
+
+    translations = data.get("translations")
+    if not isinstance(translations, dict):
+        raise TranslationResponseError(
+            "Gemini response is missing the required JSON fields."
+        )
+
+    parsed_translations: dict[str, list[str]] = {}
+    for code in languages:
+        values = translations.get(code)
+        if not isinstance(values, list) or len(values) != expected_count:
+            raise TranslationResponseError(
+                f"Gemini response has the wrong number of {code!r} lines."
+            )
+        if not all(isinstance(value, str) for value in values):
+            raise TranslationResponseError(
+                f"Gemini response has a non-string {code!r} line."
+            )
+        parsed_translations[code] = [value.strip() for value in values]
+
+    return BackfillResult(translations=parsed_translations)
 
 
 def _token_count(value: object) -> int:
@@ -317,9 +421,6 @@ class GeminiTranslator:
         glossary: "ChurchGlossary | None" = None,
     ) -> TranslationResult:
         languages = _require_languages(active_languages)
-        if not self.api_key:
-            raise GeminiConfigurationError("GEMINI_API_KEY is not set.")
-
         payload = build_request_payload(
             pcm_bytes,
             languages,
@@ -327,6 +428,52 @@ class GeminiTranslator:
             glossary=glossary,
             model=self.model,
         )
+        response_json, usage = await self._generate(payload)
+        parsed = parse_translation_response(
+            extract_response_text(response_json),
+            languages,
+        )
+        return TranslationResult(
+            japanese=parsed.japanese,
+            translations=parsed.translations,
+            usage=usage,
+        )
+
+    async def translate_lines(
+        self,
+        lines: Sequence[str],
+        active_languages: Sequence[str],
+        *,
+        glossary: "ChurchGlossary | None" = None,
+    ) -> BackfillResult:
+        languages = _require_languages(active_languages)
+        cleaned_lines = [line.strip() for line in lines if line.strip()]
+        if not cleaned_lines:
+            return BackfillResult(
+                translations={code: [] for code in languages}
+            )
+
+        payload = build_backfill_request_payload(
+            cleaned_lines,
+            languages,
+            glossary=glossary,
+            model=self.model,
+        )
+        response_json, usage = await self._generate(payload)
+        parsed = parse_backfill_response(
+            extract_response_text(response_json),
+            languages,
+            len(cleaned_lines),
+        )
+        return BackfillResult(
+            translations=parsed.translations,
+            usage=usage,
+        )
+
+    async def _generate(self, payload: dict) -> tuple[dict, GeminiUsage | None]:
+        if not self.api_key:
+            raise GeminiConfigurationError("GEMINI_API_KEY is not set.")
+
         response = await asyncio.wait_for(
             self._post_with_retries(payload),
             timeout=TOTAL_RETRY_BUDGET_SECONDS,
@@ -339,15 +486,7 @@ class GeminiTranslator:
             ) from exc
         usage = parse_usage(response_json, self.model)
         self._log_usage(usage)
-        parsed = parse_translation_response(
-            extract_response_text(response_json),
-            languages,
-        )
-        return TranslationResult(
-            japanese=parsed.japanese,
-            translations=parsed.translations,
-            usage=usage,
-        )
+        return response_json, usage
 
     async def _post_with_retries(self, payload: dict) -> httpx.Response:
         for attempt in range(1, MAX_ATTEMPTS + 1):

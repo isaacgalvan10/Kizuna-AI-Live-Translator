@@ -13,8 +13,16 @@ from app.auth import hash_password
 from app.database import Base, get_db
 from app.main import app
 from app.models import Church, User
+from app.socket_manager import manager
 
 TEST_PASSWORD = "gracious-and-true"
+
+
+@pytest.fixture(autouse=True)
+def clean_socket_manager():
+    manager.reset()
+    yield
+    manager.reset()
 
 
 @pytest.fixture
