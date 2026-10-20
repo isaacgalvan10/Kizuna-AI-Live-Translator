@@ -3,6 +3,7 @@ import logging
 
 import httpx
 
+from app.church_glossary import parse_church_glossary
 from app.gemini_translation import (
     TranslationResponseError,
     TranslationResult,
@@ -54,9 +55,15 @@ class FakeTranslator:
         active_languages,
         *,
         context_lines=(),
+        glossary=None,
     ):
         self.calls.append(
-            (pcm_bytes, tuple(active_languages), tuple(context_lines))
+            (
+                pcm_bytes,
+                tuple(active_languages),
+                tuple(context_lines),
+                glossary,
+            )
         )
         if self.error is not None:
             raise self.error
@@ -80,7 +87,7 @@ def audio_chunk() -> bytes:
     return speech(1.5) + silence(0.35)
 
 
-def make_worker(manager, translator, *, debug_diagnostics=False):
+def make_worker(manager, translator, *, debug_diagnostics=False, glossary=None):
     return GeminiWorker(
         "room-1",
         asyncio.get_running_loop(),
@@ -88,6 +95,7 @@ def make_worker(manager, translator, *, debug_diagnostics=False):
         socket_manager=manager,
         debug_diagnostics=debug_diagnostics,
         start_flusher=False,
+        glossary=glossary,
     )
 
 
@@ -100,7 +108,7 @@ async def test_worker_flushes_once_and_broadcasts_to_each_language():
     await worker._flush_once()
 
     assert len(translator.calls) == 1
-    pcm, languages, context = translator.calls[0]
+    pcm, languages, context, _ = translator.calls[0]
     assert pcm == speech(1.5)
     assert languages == ("en", "ko")
     assert context == ()
@@ -214,6 +222,41 @@ async def test_worker_passes_recent_transcript_as_context():
 
     assert translator.calls[0][2] == ()
     assert translator.calls[1][2] == ("神は愛です。",)
+
+
+async def test_worker_passes_the_church_glossary_to_every_request():
+    glossary = parse_church_glossary(
+        {
+            "names": [{"japanese": "山田牧師", "en": "Pastor Yamada"}],
+            "scripture": {"en": "NIV"},
+        }
+    )
+    manager = FakeManager(["en"])
+    translator = FakeTranslator(
+        results=[
+            TranslationResult("神は愛です。", {"en": "God is love."}),
+            TranslationResult("神は光です。", {"en": "God is light."}),
+        ]
+    )
+    worker = make_worker(manager, translator, glossary=glossary)
+
+    worker.process_audio_chunk(audio_chunk())
+    await worker._flush_once()
+    worker.process_audio_chunk(audio_chunk())
+    await worker._flush_once()
+
+    assert [call[3] for call in translator.calls] == [glossary, glossary]
+
+
+async def test_worker_uses_default_terminology_without_a_glossary():
+    manager = FakeManager(["en"])
+    translator = FakeTranslator()
+    worker = make_worker(manager, translator)
+
+    worker.process_audio_chunk(audio_chunk())
+    await worker._flush_once()
+
+    assert translator.calls[0][3] is None
 
 
 async def test_worker_keeps_only_the_last_two_context_lines():

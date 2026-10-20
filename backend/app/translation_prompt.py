@@ -1,5 +1,9 @@
 import json
 from collections.abc import Iterable, Sequence
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .church_glossary import ChurchGlossary, ChurchGlossaryEntry
 
 SUPPORTED_LANGUAGES: dict[str, str] = {
     "en": "English",
@@ -19,10 +23,87 @@ def supported_languages(codes: Iterable[str]) -> tuple[str, ...]:
     return tuple(languages)
 
 
+def _entry_lines(
+    entries: Sequence["ChurchGlossaryEntry"],
+    languages: Sequence[str],
+) -> list[str]:
+    lines: list[str] = []
+    for entry in entries:
+        renderings = [
+            f"{code}: {entry.translations[code]}"
+            for code in languages
+            if code in entry.translations
+        ]
+        if renderings:
+            lines.append(f"- {entry.japanese} -> " + "; ".join(renderings))
+    return lines
+
+
+def _language_lines(
+    values: dict[str, str],
+    languages: Sequence[str],
+) -> list[str]:
+    return [
+        f"- {SUPPORTED_LANGUAGES[code]}: {values[code]}"
+        for code in languages
+        if code in values
+    ]
+
+
+def _glossary_section(
+    glossary: "ChurchGlossary | None",
+    languages: Sequence[str],
+) -> str:
+    if glossary is None or glossary.is_empty:
+        return ""
+
+    sections: list[str] = []
+    names = _entry_lines(glossary.names, languages)
+    if names:
+        sections.append(
+            "Names (use these exact renderings):\n" + "\n".join(names)
+        )
+    terms = _entry_lines(glossary.terms, languages)
+    if terms:
+        sections.append(
+            "Terms (use these exact renderings):\n" + "\n".join(terms)
+        )
+
+    style = _language_lines(glossary.style, languages)
+    if style:
+        sections.append(
+            "Target-language style (overrides the general style above "
+            "where they differ):\n" + "\n".join(style)
+        )
+
+    scripture: list[str] = []
+    if "source" in glossary.scripture:
+        scripture.append(
+            "- Japanese source Bible text: "
+            + glossary.scripture["source"]
+        )
+    scripture.extend(_language_lines(glossary.scripture, languages))
+    if scripture:
+        sections.append(
+            "Scripture translation names (override the defaults above "
+            "where they differ):\n" + "\n".join(scripture)
+        )
+
+    if not sections:
+        return ""
+    return (
+        "\nCHURCH GLOSSARY (this church's own terminology; authoritative)\n"
+        "It takes precedence over RECENT CONTEXT for names and terms.\n\n"
+        + "\n\n".join(sections)
+        + "\n"
+    )
+
+
 def build_prompt(
     active_languages: Sequence[str],
     *,
     context_lines: Sequence[str] = (),
+    glossary: "ChurchGlossary | None" = None,
 ) -> str:
     languages = supported_languages(active_languages)
     if not languages:
@@ -57,6 +138,8 @@ def build_prompt(
             "above; start from the new speech.\n"
         )
 
+    glossary_section = _glossary_section(glossary, languages)
+
     return f"""You are an expert real-time interpreter for a Japanese Christian church sermon.
 
 TASK
@@ -78,7 +161,7 @@ TRANSLATION STYLE
 - Traditional Chinese: Protestant terminology, faithful and pastoral. Use 和合本 wording for direct Scripture quotations.
 - The source Bible text is 新共同訳. When the speaker quotes Scripture directly, use the target-language version above. When the speaker paraphrases, translate the paraphrase; do not substitute a different verse.
 - Keep names and recurring terms consistent across the sermon, following the RECENT CONTEXT wording.
-{context_section}
+{context_section}{glossary_section}
 TARGET LANGUAGES
 {language_list}
 

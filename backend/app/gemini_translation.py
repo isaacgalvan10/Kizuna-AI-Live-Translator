@@ -8,6 +8,7 @@ import random
 import wave
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import httpx
 
@@ -16,6 +17,9 @@ from .translation_prompt import (
     build_response_schema,
     supported_languages,
 )
+
+if TYPE_CHECKING:
+    from .church_glossary import ChurchGlossary
 
 DEFAULT_MODEL = "gemini-3.8-flash"
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
@@ -116,6 +120,7 @@ def build_request_payload(
     active_languages: Sequence[str],
     *,
     context_lines: Sequence[str] = (),
+    glossary: "ChurchGlossary | None" = None,
     model: str = DEFAULT_MODEL,
 ) -> dict:
     languages = _require_languages(active_languages)
@@ -128,6 +133,7 @@ def build_request_payload(
                     "text": build_prompt(
                         languages,
                         context_lines=context_lines,
+                        glossary=glossary,
                     )
                 }
             ]
@@ -308,6 +314,7 @@ class GeminiTranslator:
         active_languages: Sequence[str],
         *,
         context_lines: Sequence[str] = (),
+        glossary: "ChurchGlossary | None" = None,
     ) -> TranslationResult:
         languages = _require_languages(active_languages)
         if not self.api_key:
@@ -317,6 +324,7 @@ class GeminiTranslator:
             pcm_bytes,
             languages,
             context_lines=context_lines,
+            glossary=glossary,
             model=self.model,
         )
         response = await asyncio.wait_for(

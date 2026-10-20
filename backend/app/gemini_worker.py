@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 from collections import deque
+from typing import TYPE_CHECKING
 
 import httpx
 
@@ -11,6 +12,9 @@ from app.socket_manager import manager
 from .gemini_translation import GeminiTranslator, TranslationError
 from .translation_prompt import supported_languages
 from .transcript_text import dedupe_overlap
+
+if TYPE_CHECKING:
+    from .church_glossary import ChurchGlossary
 
 logger = logging.getLogger(__name__)
 
@@ -38,11 +42,13 @@ class GeminiWorker:
         debug_diagnostics: bool | None = None,
         start_flusher: bool = True,
         chunker: AudioChunker | None = None,
+        glossary: "ChurchGlossary | None" = None,
     ):
         self.room_id = room_id
         self.loop = loop
         self.chunker = chunker or AudioChunker()
         self.translator = translator or GeminiTranslator()
+        self.glossary = glossary
         self.manager = socket_manager or manager
         self.debug_diagnostics = (
             _debug_diagnostics_enabled()
@@ -125,6 +131,7 @@ class GeminiWorker:
                 segment.pcm,
                 active_langs,
                 context_lines=context_lines,
+                glossary=self.glossary,
             )
         except TranslationError as exc:
             logger.warning(

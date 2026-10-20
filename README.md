@@ -30,6 +30,40 @@ The command prompts for a password only when one is needed. Use `--password-stdi
 
 For local development only, `curl -X POST http://localhost:8000/api/dev/seed` still creates `operator@kizuna.test / kizuna-operator-test` with QR hash `test-hash-123`.
 
+### Church Glossary (per church)
+
+Each church can store its own Church Glossary: Japanese names, recurring
+terms, target-language style, and Scripture translation preferences. The
+worker loads the glossary when the operator connects and injects it into every
+translation request; reconnect to pick up changes. A church without a glossary
+uses the built-in defaults (ESV / 개역개정 / 和合本 from 新共同訳).
+
+This is **not** the project's [`GLOSSARY.md`](./GLOSSARY.md) at the repo root;
+that file defines the language of this codebase.
+
+Start from [`backend/examples/church-glossary.example.json`](./backend/examples/church-glossary.example.json)
+and load it (the file path is inside the backend container):
+
+```bash
+docker compose exec backend python -m app.church_glossary \
+  --church-name "Kizuna Test Church" \
+  --file examples/church-glossary.example.json
+```
+
+The document accepts `names`, `terms`, `style`, and `scripture`. Every
+`names`/`terms` entry needs a `japanese` source and at least one of `en`,
+`ko`, `zh-hans`, or `zh-hant`. `style` and `scripture` are keyed by those same
+language codes; `scripture` also accepts `source` for the Japanese Bible
+translation. Entries apply only to the languages they define; an entry with no
+rendering for an active language is omitted from that request. Unknown fields,
+missing sources, empty values, and duplicates are rejected with a clear error
+instead of being stored. Glossary text is inserted into the translation prompt,
+so keep it to names, terms, style, and Scripture preferences. Run
+`python -m app.church_glossary --church-name ... --clear` to remove a church's
+glossary and return it to the defaults. If a stored glossary becomes invalid,
+the operator stream refuses to start; re-run the CLI to see the validation
+error.
+
 **Test the full flow:**
 
 1. On the laptop open `http://localhost:5173/operate`, log in, press **Start** (needs a microphone/aux input) or just use the QR panel.

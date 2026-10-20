@@ -40,8 +40,15 @@ CANNED_TRANSLATIONS = {
 class FakeGeminiWorker:
     """Stands in for the Gemini-backed worker so no API call leaves the test."""
 
-    def __init__(self, room_id: str, loop: asyncio.AbstractEventLoop):
+    def __init__(
+        self,
+        room_id: str,
+        loop: asyncio.AbstractEventLoop,
+        *,
+        glossary=None,
+    ):
         self.room_id = room_id
+        self.glossary = glossary
 
     def start(self):
         pass

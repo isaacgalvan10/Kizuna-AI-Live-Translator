@@ -105,7 +105,7 @@ The act of translating recent transcript timeline lines into a newly active lang
 _Avoid_: History sync, catch-up
 
 **Church Glossary**:
-A church's list of names, recurring terms, preferred style, and Scripture translations used to keep wording consistent.
+A church's list of names, recurring terms, preferred style, and Scripture translations used to keep wording consistent. Distinct from `GLOSSARY.md`, which defines this project's own terms.
 _Avoid_: Glossary, dictionary, terminology list
 
 ### Guest Phone

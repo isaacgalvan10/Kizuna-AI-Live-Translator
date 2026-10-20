@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Boolean
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 from .database import Base
 import uuid
@@ -15,6 +15,19 @@ class Church(Base):
     qr_code_hash = Column(String, unique=True, index=True, default=new_qr_hash)
     
     rooms = relationship("Room", back_populates="church")
+
+class ChurchGlossaryRecord(Base):
+    __tablename__ = "church_glossaries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    church_id = Column(
+        Integer,
+        ForeignKey("churches.id"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    content = Column(Text, nullable=False)
 
 class Room(Base):
     __tablename__ = "rooms"

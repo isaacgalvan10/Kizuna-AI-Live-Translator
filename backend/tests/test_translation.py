@@ -5,6 +5,7 @@ import logging
 import httpx
 import pytest
 
+from app.church_glossary import parse_church_glossary
 from app.gemini_translation import (
     GeminiConfigurationError,
     GeminiTranslator,
@@ -153,6 +154,125 @@ def test_prompt_keeps_terminology_consistent_with_recent_context():
     assert "consistent" in prompt.lower()
 
 
+def sample_glossary():
+    return parse_church_glossary(
+        {
+            "names": [
+                {
+                    "japanese": "山田牧師",
+                    "en": "Pastor Yamada",
+                    "ko": "야마다 목사",
+                    "zh-hans": "山田牧师",
+                }
+            ],
+            "terms": [
+                {
+                    "japanese": "聖餐",
+                    "en": "Holy Communion",
+                    "ko": "성찬",
+                    "zh-hans": "圣餐",
+                }
+            ],
+            "style": {
+                "en": "Use short, warm sentences.",
+                "ko": "Use short sentences in formal polite style.",
+            },
+            "scripture": {
+                "source": "新改訳2017",
+                "en": "NIV",
+                "ko": "새번역",
+            },
+        }
+    )
+
+
+def test_prompt_injects_glossary_names_and_terms_for_active_languages():
+    prompt = build_prompt(["en", "ko"], glossary=sample_glossary())
+
+    assert "CHURCH GLOSSARY" in prompt
+    assert "山田牧師" in prompt
+    assert "Pastor Yamada" in prompt
+    assert "야마다 목사" in prompt
+    assert "聖餐" in prompt
+    assert "Holy Communion" in prompt
+    assert "성찬" in prompt
+    assert "山田牧师" not in prompt
+    assert "圣餐" not in prompt
+
+
+def test_prompt_injects_chinese_glossary_entries_when_chinese_is_active():
+    prompt = build_prompt(["zh-hans"], glossary=sample_glossary())
+
+    assert "山田牧師" in prompt
+    assert "山田牧师" in prompt
+    assert "圣餐" in prompt
+    assert "Pastor Yamada" not in prompt
+    assert "야마다 목사" not in prompt
+
+
+def test_prompt_injects_traditional_chinese_glossary_entries():
+    glossary = parse_church_glossary(
+        {"terms": [{"japanese": "教会", "zh-hant": "教會"}]}
+    )
+
+    prompt = build_prompt(["zh-hant"], glossary=glossary)
+
+    assert "zh-hant: 教會" in prompt
+
+
+def test_prompt_omits_glossary_entries_without_an_active_translation():
+    glossary = parse_church_glossary(
+        {
+            "names": [
+                {"japanese": "山田牧師", "en": "Pastor Yamada"},
+                {"japanese": "田中牧師", "ko": "다나카 목사"},
+            ]
+        }
+    )
+
+    prompt = build_prompt(["en"], glossary=glossary)
+
+    assert "山田牧師" in prompt
+    assert "田中牧師" not in prompt
+
+
+def test_prompt_applies_glossary_style_and_scripture_overrides():
+    prompt = build_prompt(["en", "ko"], glossary=sample_glossary())
+
+    assert "Use short, warm sentences." in prompt
+    assert "Use short sentences in formal polite style." in prompt
+    assert "新改訳2017" in prompt
+    assert "NIV" in prompt
+    assert "새번역" in prompt
+    assert "overrid" in prompt.lower()
+
+
+def test_prompt_without_a_glossary_keeps_defaults_and_has_no_section():
+    prompt = build_prompt(["en", "ko"])
+
+    assert "CHURCH GLOSSARY" not in prompt
+    assert "ESV" in prompt
+    assert "개역개정" in prompt
+    assert "新共同訳" in prompt
+
+
+def test_prompt_ignores_an_empty_glossary():
+    prompt = build_prompt(["en"], glossary=parse_church_glossary({}))
+
+    assert "CHURCH GLOSSARY" not in prompt
+
+
+def test_prompt_keeps_both_recent_context_and_glossary():
+    prompt = build_prompt(
+        ["en"],
+        context_lines=["前の文。"],
+        glossary=sample_glossary(),
+    )
+
+    assert "前の文。" in prompt
+    assert "山田牧師" in prompt
+
+
 def test_response_schema_has_only_requested_translations():
     schema = build_response_schema(["en", "zh-hans"])
     translations = schema["properties"]["translations"]
@@ -241,6 +361,34 @@ async def test_translator_makes_one_request_for_all_active_languages():
         "en": "God is love.",
         "ko": "하나님은 사랑이십니다.",
     }
+
+
+async def test_translator_injects_the_church_glossary_into_the_request():
+    translator, client = make_translator(
+        FakeResponse(
+            gemini_response(
+                {
+                    "japanese": "神は愛です。",
+                    "translations": {
+                        "en": "God is love.",
+                        "ko": "하나님은 사랑이십니다.",
+                    },
+                }
+            )
+        )
+    )
+    glossary = sample_glossary()
+
+    await translator.translate(
+        b"\x00\x01" * 480,
+        ["en", "ko"],
+        glossary=glossary,
+    )
+
+    prompt = client.calls[0]["json"]["systemInstruction"]["parts"][0]["text"]
+    assert prompt == build_prompt(["en", "ko"], glossary=glossary)
+    assert "CHURCH GLOSSARY" in prompt
+    assert "山田牧師" in prompt
 
 
 async def test_translator_uses_configured_model():

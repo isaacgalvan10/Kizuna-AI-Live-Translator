@@ -1,0 +1,47 @@
+{
+  "names": [
+    {
+      "japanese": "山田牧師",
+      "en": "Pastor Yamada",
+      "ko": "야마다 목사",
+      "zh-hans": "山田牧师",
+      "zh-hant": "山田牧師"
+    },
+    {
+      "japanese": "大阪キリスト教会",
+      "en": "Osaka Christ Church",
+      "ko": "오사카 그리스도 교회",
+      "zh-hans": "大阪基督教会",
+      "zh-hant": "大阪基督教會"
+    }
+  ],
+  "terms": [
+    {
+      "japanese": "聖餐",
+      "en": "Holy Communion",
+      "ko": "성찬",
+      "zh-hans": "圣餐",
+      "zh-hant": "聖餐"
+    },
+    {
+      "japanese": "礼拝",
+      "en": "worship service",
+      "ko": "예배",
+      "zh-hans": "礼拜",
+      "zh-hant": "禮拜"
+    }
+  ],
+  "style": {
+    "en": "Use short, warm sentences in a pastoral tone.",
+    "ko": "Use short sentences in formal polite style (존댓말).",
+    "zh-hans": "Use short sentences with Protestant terminology.",
+    "zh-hant": "Use short sentences with Protestant terminology."
+  },
+  "scripture": {
+    "source": "新共同訳",
+    "en": "ESV",
+    "ko": "개역개정",
+    "zh-hans": "和合本",
+    "zh-hant": "和合本"
+  }
+}

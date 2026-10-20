@@ -25,6 +25,7 @@ from .auth import (
     operator_claims_from_token,
     verify_password,
 )
+from .church_glossary import ChurchGlossaryError, load_church_glossary
 from .database import engine, Base, get_db
 from .socket_manager import (
     FEED_STATE_LIVE,
@@ -49,6 +50,8 @@ logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
+
+logger = logging.getLogger(__name__)
 
 # Active workers dictionary
 active_gemini_workers: dict[str, GeminiWorker] = {}
@@ -118,10 +121,28 @@ async def stream_audio(
     if room is None:
         raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
 
+    # A church without a glossary gets the default terminology. A stored
+    # glossary that fails validation aborts the handshake instead of being
+    # silently ignored: a clear failure is safer than wrong translations.
+    try:
+        glossary = await load_church_glossary(db, room.church_id)
+    except ChurchGlossaryError as exc:
+        # Log only the location, never the validation message: parser errors
+        # can quote glossary content (names and terms are personal data).
+        logger.error(
+            "church_glossary_invalid room_id=%d church_id=%d",
+            room.id,
+            room.church_id,
+        )
+        raise WebSocketException(
+            code=status.WS_1011_INTERNAL_ERROR,
+            reason="Church Glossary is invalid. Contact an administrator.",
+        ) from exc
+
     await websocket.accept()
     loop = asyncio.get_running_loop()
 
-    worker = GeminiWorker(str(room.id), loop)
+    worker = GeminiWorker(str(room.id), loop, glossary=glossary)
     worker.start()
     active_gemini_workers[str(room.id)] = worker
 
