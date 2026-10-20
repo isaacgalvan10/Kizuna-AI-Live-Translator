@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 — Structured translation output + configurable model.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] 429, 5xx, and timeout responses retry with bounded exponential backoff and jitter; permanent failures do not hot-loop.
 - [x] A failed request never re-sends audio that already reached listeners, and a retry never duplicates a translated line.

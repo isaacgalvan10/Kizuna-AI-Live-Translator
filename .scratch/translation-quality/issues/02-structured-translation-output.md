@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] The Gemini model is configurable without code changes; the initial default is `gemini-3.8-flash` with low thinking.
 - [x] Responses are parsed from JSON matching a schema; no `[JA]` or `[EN]` tag regex remains.

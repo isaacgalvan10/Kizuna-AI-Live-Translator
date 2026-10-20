@@ -12,4 +12,8 @@ The skills speak in terms of five canonical triage roles. This file maps those r
 
 When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
 
+## Completion state
+
+`done` is a lifecycle state, not a triage role. When an implementation ticket's acceptance criteria are met and verification is recorded, set `Status: done`. Triage skills treat `done` tickets as closed.
+
 Edit the "Label in our tracker" column to match whatever vocabulary you actually use.

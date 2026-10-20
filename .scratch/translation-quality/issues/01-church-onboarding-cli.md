@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] A new church run creates exactly one Church, one Room, one operator User, and a QR hash.
 - [x] Re-running with the same arguments creates no duplicates and exits successfully.
