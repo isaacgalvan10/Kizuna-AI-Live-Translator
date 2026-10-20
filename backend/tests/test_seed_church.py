@@ -1,3 +1,8 @@
+import argparse
+import io
+import re
+import sqlite3
+
 import pytest
 from sqlalchemy import func, select, text
 
@@ -6,6 +11,9 @@ from app.models import Church, Room, User
 from app.seed_church import (
     PasswordRequiredError,
     SeedChurchError,
+    _origin,
+    _read_password,
+    main,
     seed_church,
 )
 
@@ -261,3 +269,126 @@ async def test_seed_church_backfills_a_missing_qr_hash(db_session):
     assert first.church_created is False
     assert first.qr_code_hash
     assert second.qr_code_hash == first.qr_code_hash
+
+
+def test_read_password_reads_stdin(monkeypatch):
+    monkeypatch.setattr("sys.stdin", io.StringIO("secret-password\n"))
+    args = argparse.Namespace(password_stdin=True, generate_password=False)
+
+    password, generated = _read_password(args)
+
+    assert password == "secret-password"
+    assert generated is None
+
+
+def test_read_password_generates_a_password():
+    args = argparse.Namespace(password_stdin=False, generate_password=True)
+
+    password, generated = _read_password(args)
+
+    assert password == generated
+    assert len(password) >= 24
+
+
+def test_read_password_rejects_mismatched_interactive_input(monkeypatch):
+    responses = iter(["first-password", "second-password"])
+    monkeypatch.setattr(
+        "app.seed_church.getpass.getpass",
+        lambda prompt="": next(responses),
+    )
+    args = argparse.Namespace(password_stdin=False, generate_password=False)
+
+    with pytest.raises(SeedChurchError, match="do not match"):
+        _read_password(args)
+
+
+def test_origin_rejects_a_non_http_url():
+    with pytest.raises(SeedChurchError, match="http"):
+        _origin("church.example")
+
+
+def test_main_reads_password_from_stdin_and_prints_urls(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    db_path = tmp_path / "cli.db"
+    monkeypatch.setenv(
+        "DATABASE_URL",
+        f"sqlite+aiosqlite:///{db_path.as_posix()}",
+    )
+    monkeypatch.setattr("sys.stdin", io.StringIO("cli-password\n"))
+
+    main(
+        [
+            "--church-name",
+            "CLI Church",
+            "--email",
+            "cli@example.com",
+            "--password-stdin",
+            "--public-origin",
+            "https://church.example",
+        ]
+    )
+
+    output = capsys.readouterr().out
+    assert "Church: CLI Church" in output
+    assert "Guest join URL: https://church.example/?qr=" in output
+    assert "Operator URL: https://church.example/operate" in output
+    assert "cli-password" not in output
+
+    with sqlite3.connect(db_path) as connection:
+        email, hashed_password = connection.execute(
+            "SELECT email, hashed_password FROM users"
+        ).fetchone()
+    assert email == "cli@example.com"
+    assert verify_password("cli-password", hashed_password)
+
+
+def test_main_generates_and_prints_a_password_once(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    db_path = tmp_path / "generated.db"
+    monkeypatch.setenv(
+        "DATABASE_URL",
+        f"sqlite+aiosqlite:///{db_path.as_posix()}",
+    )
+
+    main(
+        [
+            "--church-name",
+            "Generated Church",
+            "--email",
+            "generated@example.com",
+            "--generate-password",
+        ]
+    )
+
+    output = capsys.readouterr().out
+    match = re.search(r"Generated password \(shown once\): (\S+)", output)
+    assert match is not None
+    password = match.group(1)
+    assert output.count(password) == 1
+
+    with sqlite3.connect(db_path) as connection:
+        hashed_password = connection.execute(
+            "SELECT hashed_password FROM users WHERE email = ?",
+            ("generated@example.com",),
+        ).fetchone()[0]
+    assert verify_password(password, hashed_password)
+
+
+def test_main_requires_database_url(monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+
+    with pytest.raises(SystemExit, match="DATABASE_URL"):
+        main(
+            [
+                "--church-name",
+                "No Database",
+                "--email",
+                "no-db@example.com",
+            ]
+        )

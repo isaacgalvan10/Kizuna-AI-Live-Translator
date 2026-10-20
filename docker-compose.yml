@@ -38,7 +38,10 @@ services:
       # match the db service so the stack boots even without a .env file.
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-kizuna_db}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.8-flash}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - KIZUNA_DEBUG_DIAGNOSTICS=${KIZUNA_DEBUG_DIAGNOSTICS:-}
 
   # 3. THE FRONTEND (Vite React dev server)
   frontend:

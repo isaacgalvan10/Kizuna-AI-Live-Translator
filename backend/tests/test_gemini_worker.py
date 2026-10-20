@@ -178,6 +178,20 @@ async def test_worker_opt_in_diagnostics_log_audio_metadata_without_transcript(
     assert "God is love." not in caplog.text
 
 
+async def test_worker_logs_deadline_exceeded_without_requeue(caplog):
+    caplog.set_level(logging.WARNING, logger="app.gemini_worker")
+    manager = FakeManager(["en"])
+    translator = FakeTranslator(error=TimeoutError())
+    worker = make_worker(manager, translator)
+    worker.process_audio_chunk(audio_chunk())
+
+    await worker._flush_once()
+
+    assert "gemini_deadline_exceeded" in caplog.text
+    assert "神は愛です。" not in caplog.text
+    assert len(worker.audio_buffer) == 0
+
+
 async def test_worker_logs_transport_error_without_requeue(caplog):
     caplog.set_level(logging.WARNING, logger="app.gemini_worker")
     manager = FakeManager(["en"])

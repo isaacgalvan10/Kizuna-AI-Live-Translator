@@ -19,5 +19,6 @@
 ## Comments
 
 - Implemented `backend/app/seed_church.py` and `backend/tests/test_seed_church.py`; README now documents the CLI.
-- Verified with `pytest tests/test_seed_church.py -q` (10 passed), the full backend suite (64 passed), and a manual CLI smoke test covering create, rerun, and password reset against SQLite.
+- Verified with `pytest tests/test_seed_church.py -q` (17 passed: 10 data tests plus 7 CLI/password/output tests), the full backend suite (109 passed at final integration), and a manual CLI smoke test covering create, rerun, and password reset against SQLite.
+- Review fix pass added CLI-level coverage for stdin and generated passwords, password mismatch, origin validation, printed join/operator URLs, database writes, and the missing-`DATABASE_URL` guard.
 - All acceptance criteria are met; the production onboarding path no longer depends on `/api/dev/seed`, which remains local-only.

@@ -1,4 +1,6 @@
+import asyncio
 import json
+import logging
 
 import httpx
 import pytest
@@ -7,6 +9,7 @@ from app.gemini_translation import (
     GeminiConfigurationError,
     GeminiTranslator,
     NoActiveLanguagesError,
+    REQUEST_TIMEOUT_SECONDS,
     TranslationResponseError,
     build_request_payload,
     build_response_schema,
@@ -85,6 +88,11 @@ class FakeHttpClient:
 
     async def aclose(self):
         self.closed = True
+
+
+class HangingHttpClient:
+    async def post(self, url, *, headers=None, json=None, timeout=None):
+        await asyncio.sleep(1)
 
 
 def make_translator(
@@ -200,7 +208,7 @@ async def test_translator_makes_one_request_for_all_active_languages():
     )
     assert call["headers"] == {"x-goog-api-key": "test-key"}
     assert "test-key" not in call["url"]
-    assert call["timeout"] == 20.0
+    assert call["timeout"] == REQUEST_TIMEOUT_SECONDS
 
     payload = call["json"]
     assert payload["systemInstruction"]["parts"][0]["text"] == build_prompt(
@@ -510,6 +518,61 @@ async def test_translator_leaves_usage_empty_when_metadata_is_missing():
     result = await translator.translate(b"\x00\x01" * 480, ["en"])
 
     assert result.usage is None
+
+
+async def test_translator_logs_usage_before_rejecting_a_blocked_response(caplog):
+    caplog.set_level(logging.INFO, logger="app.gemini_translation")
+    translator, _ = make_translator(
+        FakeResponse(
+            {
+                "promptFeedback": {"blockReason": "SAFETY"},
+                "usageMetadata": {
+                    "promptTokenCount": 100,
+                    "candidatesTokenCount": 0,
+                    "thoughtsTokenCount": 0,
+                    "totalTokenCount": 100,
+                },
+            }
+        )
+    )
+
+    with pytest.raises(TranslationResponseError, match="blocked"):
+        await translator.translate(b"\x00\x01" * 480, ["en"])
+
+    assert "gemini_usage" in caplog.text
+    assert "input_tokens=100" in caplog.text
+
+
+async def test_translator_rejects_an_empty_response():
+    translator, _ = make_translator(
+        FakeResponse(
+            {
+                "candidates": [
+                    {
+                        "content": {"parts": []},
+                        "finishReason": "STOP",
+                    }
+                ]
+            }
+        )
+    )
+
+    with pytest.raises(TranslationResponseError, match="empty response"):
+        await translator.translate(b"\x00\x01" * 480, ["en"])
+
+
+async def test_translator_enforces_an_overall_retry_budget(monkeypatch):
+    monkeypatch.setattr(
+        "app.gemini_translation.TOTAL_RETRY_BUDGET_SECONDS",
+        0.05,
+    )
+    translator = GeminiTranslator(
+        api_key="test-key",
+        http_client=HangingHttpClient(),
+    )
+
+    with pytest.raises(TimeoutError):
+        await translator.translate(b"\x00\x01" * 480, ["en"])
 
 
 async def test_translator_does_not_close_an_injected_client():

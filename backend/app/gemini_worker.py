@@ -107,6 +107,12 @@ class GeminiWorker:
                 type(exc).__name__,
             )
             return
+        except TimeoutError:
+            logger.warning(
+                "gemini_deadline_exceeded room_id=%s",
+                self.room_id,
+            )
+            return
         except httpx.HTTPStatusError as exc:
             logger.warning(
                 "gemini_http_error room_id=%s status=%d",

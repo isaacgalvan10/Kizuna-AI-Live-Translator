@@ -23,10 +23,9 @@ MAX_OUTPUT_TOKENS = 2048
 MAX_ATTEMPTS = 3
 BASE_RETRY_DELAY = 0.5
 MAX_RETRY_DELAY = 4.0
-RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
-BLOCKED_FINISH_REASONS = frozenset(
-    {"SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII"}
-)
+REQUEST_TIMEOUT_SECONDS = 5.0
+TOTAL_RETRY_BUDGET_SECONDS = 8.0
+RETRYABLE_STATUS_CODES = frozenset({408, 429, 500, 502, 503, 504, 507, 508})
 MODEL_PRICING: dict[str, tuple[float, float]] = {
     "gemini-3.8-flash": (0.75, 3.75),
     "gemini-3.5-flash-lite": (0.30, 2.50),
@@ -75,6 +74,13 @@ def normalize_model(model: str | None) -> str:
     return value or DEFAULT_MODEL
 
 
+def _require_languages(active_languages: Sequence[str]) -> tuple[str, ...]:
+    languages = supported_languages(active_languages)
+    if not languages:
+        raise NoActiveLanguagesError("At least one supported language is required.")
+    return languages
+
+
 def pcm_to_wav(
     pcm_bytes: bytes,
     sample_rate: int = 16000,
@@ -112,9 +118,7 @@ def build_request_payload(
     context_lines: Sequence[str] = (),
     model: str = DEFAULT_MODEL,
 ) -> dict:
-    languages = supported_languages(active_languages)
-    if not languages:
-        raise NoActiveLanguagesError("At least one supported language is required.")
+    languages = _require_languages(active_languages)
 
     encoded_audio = base64.b64encode(pcm_to_wav(pcm_bytes)).decode("ascii")
     return {
@@ -167,10 +171,6 @@ def extract_response_text(response_json: dict) -> str:
 
     candidate = candidates[0] or {}
     finish_reason = str(candidate.get("finishReason") or "").upper()
-    if finish_reason in BLOCKED_FINISH_REASONS:
-        raise TranslationResponseError(
-            f"Gemini stopped with finish reason {finish_reason}."
-        )
     if finish_reason not in ("", "STOP"):
         raise TranslationResponseError(
             f"Gemini stopped with finish reason {finish_reason}."
@@ -190,9 +190,7 @@ def parse_translation_response(
     raw_text: str,
     active_languages: Sequence[str],
 ) -> TranslationResult:
-    languages = supported_languages(active_languages)
-    if not languages:
-        raise NoActiveLanguagesError("At least one supported language is required.")
+    languages = _require_languages(active_languages)
 
     try:
         data = json.loads(raw_text)
@@ -257,6 +255,8 @@ def estimate_cost_usd(
 
 
 def parse_usage(response_json: dict, model: str) -> GeminiUsage | None:
+    if not isinstance(response_json, dict):
+        return None
     metadata = response_json.get("usageMetadata")
     if not isinstance(metadata, dict) or not metadata:
         return None
@@ -309,11 +309,7 @@ class GeminiTranslator:
         *,
         context_lines: Sequence[str] = (),
     ) -> TranslationResult:
-        languages = supported_languages(active_languages)
-        if not languages:
-            raise NoActiveLanguagesError(
-                "At least one supported language is required."
-            )
+        languages = _require_languages(active_languages)
         if not self.api_key:
             raise GeminiConfigurationError("GEMINI_API_KEY is not set.")
 
@@ -323,19 +319,22 @@ class GeminiTranslator:
             context_lines=context_lines,
             model=self.model,
         )
-        response = await self._post_with_retries(payload)
+        response = await asyncio.wait_for(
+            self._post_with_retries(payload),
+            timeout=TOTAL_RETRY_BUDGET_SECONDS,
+        )
         try:
             response_json = response.json()
         except ValueError as exc:
             raise TranslationResponseError(
                 "Gemini returned a non-JSON HTTP response."
             ) from exc
+        usage = parse_usage(response_json, self.model)
+        self._log_usage(usage)
         parsed = parse_translation_response(
             extract_response_text(response_json),
             languages,
         )
-        usage = parse_usage(response_json, self.model)
-        self._log_usage(usage)
         return TranslationResult(
             japanese=parsed.japanese,
             translations=parsed.translations,
@@ -349,34 +348,31 @@ class GeminiTranslator:
                     self.url,
                     headers={"x-goog-api-key": self.api_key},
                     json=payload,
-                    timeout=20.0,
+                    timeout=REQUEST_TIMEOUT_SECONDS,
                 )
             except httpx.TransportError:
                 if attempt >= MAX_ATTEMPTS:
                     raise
-                delay = self._retry_delay(attempt)
-                logger.warning(
-                    "gemini_retry attempt=%d reason=transport_error delay=%.2fs",
-                    attempt,
-                    delay,
-                )
-                await self._sleep(delay)
+                await self._retry(attempt, "transport_error")
                 continue
             if response.status_code in RETRYABLE_STATUS_CODES:
                 if attempt >= MAX_ATTEMPTS:
                     response.raise_for_status()
-                delay = self._retry_delay(attempt)
-                logger.warning(
-                    "gemini_retry attempt=%d status=%d delay=%.2fs",
-                    attempt,
-                    response.status_code,
-                    delay,
-                )
-                await self._sleep(delay)
+                await self._retry(attempt, f"status_{response.status_code}")
                 continue
             response.raise_for_status()
             return response
         raise RuntimeError("Gemini retry loop exhausted without a response.")
+
+    async def _retry(self, attempt: int, reason: str) -> None:
+        delay = self._retry_delay(attempt)
+        logger.warning(
+            "gemini_retry attempt=%d reason=%s delay=%.2fs",
+            attempt,
+            reason,
+            delay,
+        )
+        await self._sleep(delay)
 
     @staticmethod
     def _retry_delay(attempt: int) -> float:
