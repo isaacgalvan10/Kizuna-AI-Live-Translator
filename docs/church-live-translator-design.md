@@ -32,6 +32,8 @@ Design a real-time translator for a Japanese Christian church service in Osaka: 
 - A (operator laptop/phone mic): hears singing, clapping, congregation — wrecks transcription and music-pause.
 - C (dedicated recorder on pulpit): misses handheld mics off the pulpit.
 
+> **Amended (2026-10-20, ADR-0001):** B remains the recommended default, but ticket 05 makes the audio input operator-selectable. Laptop microphone mode is available as a deliberate fallback; mixer mode stays the default. See `docs/adr/0001-operator-selectable-audio-input.md`.
+
 ### Q3: Who pauses the live feed during worship music?
 **Decision: A** — Operator Pause/Resume only; guests see Paused and TTS stops.
 **Rejected:**

@@ -45,7 +45,7 @@ The printed code in the pew that opens a church's language picker. Permanent for
 _Avoid_: Link, invite code
 
 **Mixer**:
-The sound desk that feeds sermon audio to the operator's laptop. The audio source for the live feed.
+The sound desk that feeds sermon audio to the operator's laptop. The default audio source for the live feed; the operator can switch to the laptop microphone when the mixer feed is unavailable.
 _Avoid_: Soundboard, console
 
 ### The Live Feed

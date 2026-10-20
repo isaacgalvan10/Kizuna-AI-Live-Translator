@@ -1,8 +1,9 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mock } from 'vitest';
 import OperatorConsole from './OperatorConsole';
+import { AUDIO_INPUT_STORAGE_KEY } from '../audio/audioInput';
 import { OPERATOR_STATE_VISUALS } from '../feedStateVisuals';
 import api from '../api';
 import { retiredStyleViolations } from '../test/retiredStyles';
@@ -73,29 +74,105 @@ class FakeWebSocket {
   }
 }
 
-function stubAudioCapture() {
+function fakeStream() {
+  const track = { stop: vi.fn(), onended: null as null | (() => void) };
+  return {
+    track,
+    stream: {
+      getTracks: () => [track],
+      getAudioTracks: () => [track],
+    } as unknown as MediaStream,
+  };
+}
+
+const DEFAULT_INPUT_DEVICES = [
+  { deviceId: 'default', kind: 'audioinput', label: 'Default Microphone' },
+  { deviceId: 'usb-mixer', kind: 'audioinput', label: 'USB Mixer' },
+  { deviceId: 'speakers', kind: 'audiooutput', label: 'Speakers' },
+];
+
+interface AudioCaptureOptions {
+  sampleRate?: number;
+  devices?: typeof DEFAULT_INPUT_DEVICES;
+  getUserMedia?: Mock;
+  waveform?: (data: Float32Array) => void;
+  contextState?: AudioContextState;
+  resume?: Mock;
+}
+
+function stubAudioCapture(options: AudioCaptureOptions = {}) {
   const processor = {
     connect: vi.fn(),
     disconnect: vi.fn(),
-    onaudioprocess: null as null | ((event: unknown) => void),
+    onaudioprocess: null as null | ((event: AudioProcessingEvent) => void),
   };
+  const analyser = {
+    fftSize: 2048,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    getFloatTimeDomainData: vi.fn((data: Float32Array) => {
+      if (options.waveform) options.waveform(data);
+      else data.fill(0);
+    }),
+  };
+  const source = { connect: vi.fn(), disconnect: vi.fn() };
   const context = {
+    sampleRate: options.sampleRate ?? 16000,
+    state: (options.contextState ?? 'running') as AudioContextState,
     destination: {},
-    createMediaStreamSource: vi.fn(() => ({ connect: vi.fn() })),
+    resume:
+      options.resume ??
+      vi.fn(async () => {
+        context.state = 'running';
+      }),
+    close: vi.fn().mockResolvedValue(undefined),
+    createMediaStreamSource: vi.fn(() => source),
+    createAnalyser: vi.fn(() => analyser),
     createScriptProcessor: vi.fn(() => processor),
-    close: vi.fn(),
   };
+  const streams: ReturnType<typeof fakeStream>[] = [];
+  const getUserMedia =
+    options.getUserMedia ??
+    vi.fn(async () => {
+      const made = fakeStream();
+      streams.push(made);
+      return made.stream;
+    });
+  const enumerateDevices = vi.fn(async () => options.devices ?? DEFAULT_INPUT_DEVICES);
+  const deviceChangeListeners = new Set<() => void>();
+  const mediaDevices = {
+    getUserMedia,
+    enumerateDevices,
+    addEventListener: vi.fn((type: string, listener: () => void) => {
+      if (type === 'devicechange') deviceChangeListeners.add(listener);
+    }),
+    removeEventListener: vi.fn((type: string, listener: () => void) => {
+      if (type === 'devicechange') deviceChangeListeners.delete(listener);
+    }),
+  };
+  Object.defineProperty(window.navigator, 'mediaDevices', {
+    configurable: true,
+    value: mediaDevices,
+  });
+
   vi.stubGlobal(
     'AudioContext',
     vi.fn(function AudioContextStub() {
       return context;
     })
   );
-  Object.defineProperty(window.navigator, 'mediaDevices', {
-    configurable: true,
-    value: { getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }) },
-  });
-  return { processor, context };
+  return {
+    processor,
+    context,
+    analyser,
+    source,
+    getUserMedia,
+    enumerateDevices,
+    fireDeviceChange() {
+      for (const listener of deviceChangeListeners) listener();
+    },
+    lastTrack: () => streams[streams.length - 1]?.track,
+  };
 }
 
 async function renderConsoleWithStoredSession() {
@@ -103,6 +180,11 @@ async function renderConsoleWithStoredSession() {
   mockedGet.mockResolvedValue({ data: CHURCH });
   const view = render(<OperatorConsole />);
   await screen.findByText('Kizuna Test Church');
+  await waitFor(() =>
+    expect(
+      FakeWebSocket.instances.some((socket) => socket.url.includes('/ws/listen/3/operator'))
+    ).toBe(true)
+  );
   return view;
 }
 
@@ -127,6 +209,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  cleanup();
   HTMLCanvasElement.prototype.getContext = originalGetContext;
   vi.unstubAllGlobals();
 });
@@ -372,6 +455,301 @@ describe('feed control', () => {
       })
     );
     expect(await screen.findByRole('status')).toHaveTextContent('Live');
+  });
+});
+
+describe('audio input', () => {
+  const AUDIO_INPUT_KEY = AUDIO_INPUT_STORAGE_KEY;
+
+  it('lists audio input devices after microphone permission is granted', async () => {
+    await renderConsoleWithStoredSession();
+
+    const select = await screen.findByLabelText('Input device');
+    await waitFor(() =>
+      expect(within(select).getByRole('option', { name: 'USB Mixer' })).toBeInTheDocument()
+    );
+
+    expect(
+      within(select).getByRole('option', { name: 'Default Microphone' })
+    ).toBeInTheDocument();
+    expect(
+      within(select).getByRole('option', { name: 'System default input' })
+    ).toBeInTheDocument();
+    expect(within(select).queryByRole('option', { name: 'Speakers' })).not.toBeInTheDocument();
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalled();
+  });
+
+  it('persists the selected input device and uses it for capture', async () => {
+    const user = userEvent.setup();
+    await renderConsoleWithStoredSession();
+    const select = await screen.findByLabelText('Input device');
+    await waitFor(() =>
+      expect(within(select).getByRole('option', { name: 'USB Mixer' })).toBeInTheDocument()
+    );
+
+    await user.selectOptions(select, 'usb-mixer');
+
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem(AUDIO_INPUT_KEY) ?? 'null')).toEqual({
+        deviceId: 'usb-mixer',
+        mode: 'mixer',
+      })
+    );
+    await waitFor(() =>
+      expect(navigator.mediaDevices.getUserMedia).toHaveBeenLastCalledWith({
+        audio: expect.objectContaining({ deviceId: { exact: 'usb-mixer' } }),
+      })
+    );
+
+    cleanup();
+    render(<OperatorConsole />);
+
+    const restored = await screen.findByLabelText('Input device');
+    await waitFor(() =>
+      expect(within(restored).getByRole('option', { name: 'USB Mixer' })).toBeInTheDocument()
+    );
+    expect(restored).toHaveValue('usb-mixer');
+    await waitFor(() =>
+      expect(navigator.mediaDevices.getUserMedia).toHaveBeenLastCalledWith({
+        audio: expect.objectContaining({ deviceId: { exact: 'usb-mixer' } }),
+      })
+    );
+  });
+
+  it('keeps browser speech processing on only for the laptop microphone', async () => {
+    const user = userEvent.setup();
+    await renderConsoleWithStoredSession();
+    await screen.findByLabelText('Input device');
+
+    expect(screen.getByRole('radio', { name: /mixer \/ line input/i })).toBeChecked();
+    await waitFor(() =>
+      expect(navigator.mediaDevices.getUserMedia).toHaveBeenLastCalledWith({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+      })
+    );
+
+    await user.click(screen.getByRole('radio', { name: /laptop microphone/i }));
+
+    await waitFor(() =>
+      expect(navigator.mediaDevices.getUserMedia).toHaveBeenLastCalledWith({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      })
+    );
+    expect(JSON.parse(localStorage.getItem(AUDIO_INPUT_KEY) ?? 'null')).toEqual({
+      deviceId: null,
+      mode: 'microphone',
+    });
+
+    await user.click(screen.getByRole('radio', { name: /mixer \/ line input/i }));
+
+    await waitFor(() =>
+      expect(navigator.mediaDevices.getUserMedia).toHaveBeenLastCalledWith({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+      })
+    );
+    expect(JSON.parse(localStorage.getItem(AUDIO_INPUT_KEY) ?? 'null')).toEqual({
+      deviceId: null,
+      mode: 'mixer',
+    });
+  });
+
+  it('shows arriving audio on the level meter before Start', async () => {
+    stubAudioCapture({
+      waveform: (data) => {
+        for (let i = 0; i < data.length; i++) data[i] = 0.5 * Math.sin(i / 8);
+      },
+    });
+    await renderConsoleWithStoredSession();
+
+    const meter = await screen.findByRole('meter', { name: 'Input level' });
+
+    await waitFor(() =>
+      expect(Number(meter.getAttribute('aria-valuenow'))).toBeGreaterThan(50)
+    );
+    expect(screen.getByText('Audio detected')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled();
+  });
+
+  it('shows an empty meter when the input is silent', async () => {
+    await renderConsoleWithStoredSession();
+
+    const meter = await screen.findByRole('meter', { name: 'Input level' });
+
+    expect(meter).toHaveAttribute('aria-valuenow', '0');
+    expect(screen.getByText('No audio')).toBeInTheDocument();
+  });
+
+  it('falls back to the default input when the selected device is unplugged', async () => {
+    localStorage.setItem(
+      AUDIO_INPUT_KEY,
+      JSON.stringify({ deviceId: 'usb-mixer', mode: 'microphone' })
+    );
+    const capture = stubAudioCapture();
+    await renderConsoleWithStoredSession();
+    const select = await screen.findByLabelText('Input device');
+    await waitFor(() => expect(select).toHaveValue('usb-mixer'));
+
+    capture.enumerateDevices.mockResolvedValue([
+      { deviceId: 'default', kind: 'audioinput', label: 'Default Microphone' },
+    ]);
+    act(() => capture.fireDeviceChange());
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/input device disconnected/i);
+    await waitFor(() => expect(select).toHaveValue(''));
+    // The fallback is for this visit only: a reload tries the saved device again.
+    expect(JSON.parse(localStorage.getItem(AUDIO_INPUT_KEY) ?? 'null')).toEqual({
+      deviceId: 'usb-mixer',
+      mode: 'microphone',
+    });
+    await waitFor(() => {
+      const calls = (navigator.mediaDevices.getUserMedia as unknown as Mock).mock.calls;
+      expect(calls.at(-1)?.[0].audio).not.toHaveProperty('deviceId');
+    });
+  });
+
+  it('explains denied permission and lets the operator retry', async () => {
+    const user = userEvent.setup();
+    const userMedia = stubAudioCapture();
+    const denied = Object.assign(new Error('Permission denied'), { name: 'NotAllowedError' });
+    (userMedia.getUserMedia as Mock)
+      .mockRejectedValueOnce(denied)
+      .mockResolvedValueOnce(fakeStream().stream);
+    await renderConsoleWithStoredSession();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/allow microphone access/i);
+
+    await user.click(screen.getByRole('button', { name: 'Retry audio input' }));
+
+    await waitFor(() => expect(userMedia.getUserMedia).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+  });
+
+  it('resamples a browser capture that ignores the 16 kHz request', async () => {
+    const user = userEvent.setup();
+    const capture = stubAudioCapture({ sampleRate: 48000 });
+    await renderConsoleWithStoredSession();
+
+    expect(
+      await screen.findByText(/48 kHz.*resampling to 16 kHz/i)
+    ).toBeInTheDocument();
+
+    mockedPost.mockResolvedValueOnce({ data: { status: 'live' } });
+    await user.click(screen.getByRole('button', { name: 'Start' }));
+    act(() => FakeWebSocket.find('/ws/stream/').open());
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Live'));
+
+    act(() => {
+      capture.processor.onaudioprocess?.({
+        inputBuffer: { getChannelData: () => new Float32Array(4096).fill(0.5) },
+      } as unknown as AudioProcessingEvent);
+    });
+
+    const sent = FakeWebSocket.find('/ws/stream/').sent;
+    expect(sent).toHaveLength(1);
+    const bytes = sent[0] as ArrayBuffer;
+    expect(bytes.byteLength).toBeGreaterThan(2000);
+    expect(bytes.byteLength).toBeLessThan(4000);
+  });
+
+  it('resumes a suspended audio context when Start is pressed', async () => {
+    const user = userEvent.setup();
+    const resume = vi.fn();
+    const capture = stubAudioCapture({ contextState: 'suspended', resume });
+    resume
+      .mockResolvedValueOnce(undefined)
+      .mockImplementation(async () => {
+        capture.context.state = 'running';
+      });
+    await renderConsoleWithStoredSession();
+
+    mockedPost.mockResolvedValueOnce({ data: { status: 'live' } });
+    await user.click(screen.getByRole('button', { name: 'Start' }));
+    act(() => FakeWebSocket.find('/ws/stream/').open());
+
+    await waitFor(() => expect(resume).toHaveBeenCalledTimes(2));
+    expect(capture.processor.connect).toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Live'));
+  });
+
+  it('keeps streaming through an unplug by switching to the default input', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem(
+      AUDIO_INPUT_KEY,
+      JSON.stringify({ deviceId: 'usb-mixer', mode: 'mixer' })
+    );
+    const capture = stubAudioCapture();
+    await renderConsoleWithStoredSession();
+    const select = await screen.findByLabelText('Input device');
+    await waitFor(() => expect(select).toHaveValue('usb-mixer'));
+
+    mockedPost.mockResolvedValueOnce({ data: { status: 'live' } });
+    await user.click(screen.getByRole('button', { name: 'Start' }));
+    act(() => FakeWebSocket.find('/ws/stream/').open());
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Live'));
+
+    act(() => {
+      capture.processor.onaudioprocess?.({
+        inputBuffer: { getChannelData: () => new Float32Array(4096).fill(0.5) },
+      } as unknown as AudioProcessingEvent);
+    });
+    expect(FakeWebSocket.find('/ws/stream/').sent).toHaveLength(1);
+
+    capture.enumerateDevices.mockResolvedValue([
+      { deviceId: 'default', kind: 'audioinput', label: 'Default Microphone' },
+    ]);
+    act(() => capture.fireDeviceChange());
+
+    await waitFor(() => expect(select).toHaveValue(''));
+    await waitFor(() => expect(capture.getUserMedia).toHaveBeenCalledTimes(2));
+
+    act(() => {
+      capture.processor.onaudioprocess?.({
+        inputBuffer: { getChannelData: () => new Float32Array(4096).fill(0.5) },
+      } as unknown as AudioProcessingEvent);
+    });
+    expect(FakeWebSocket.find('/ws/stream/').sent).toHaveLength(2);
+  });
+
+  it('reacquires before capturing when the fallback input failed', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem(
+      AUDIO_INPUT_KEY,
+      JSON.stringify({ deviceId: 'usb-mixer', mode: 'microphone' })
+    );
+    const capture = stubAudioCapture();
+    await renderConsoleWithStoredSession();
+    const select = await screen.findByLabelText('Input device');
+    await waitFor(() => expect(select).toHaveValue('usb-mixer'));
+
+    (capture.getUserMedia as Mock).mockRejectedValueOnce(
+      Object.assign(new Error('No input'), { name: 'NotFoundError' })
+    );
+    capture.enumerateDevices.mockResolvedValue([
+      { deviceId: 'default', kind: 'audioinput', label: 'Default Microphone' },
+    ]);
+    act(() => capture.lastTrack()?.onended?.());
+
+    expect(await screen.findByText(/could not open/i)).toBeInTheDocument();
+
+    mockedPost.mockResolvedValueOnce({ data: { status: 'live' } });
+    await user.click(screen.getByRole('button', { name: 'Start' }));
+    act(() => FakeWebSocket.find('/ws/stream/').open());
+
+    await waitFor(() => expect(capture.getUserMedia).toHaveBeenCalledTimes(3));
+    expect(capture.processor.connect).toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Live'));
   });
 });
 

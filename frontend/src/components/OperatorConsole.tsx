@@ -3,10 +3,14 @@ import type { FormEvent } from 'react';
 import { isAxiosError } from 'axios';
 import { QRCodeCanvas } from 'qrcode.react';
 import api from '../api';
+import { useAudioInput } from '../audio/useAudioInput';
 import { FEED_BUTTON_RAMPS, OPERATOR_STATE_VISUALS } from '../feedStateVisuals';
 import type { FeedState } from '../feedStateVisuals';
+import { FOCUS } from '../focus';
 import { WS_ORIGIN } from '../ws';
+import AudioInputPanel from './AudioInputPanel';
 import BrandMark from './BrandMark';
+import ErrorBanner from './ErrorBanner';
 
 const TOKEN_STORAGE_KEY = 'kizuna_operator_token';
 // The QR must encode the address guests can actually reach. In production that
@@ -47,23 +51,6 @@ function authHeaders(token: string) {
 const FEED_BUTTON =
   'cursor-pointer rounded-2xl bg-linear-to-b py-5 text-[21px] font-extrabold tracking-[0.02em] text-btn-ink transition-[filter] duration-150 enabled:hover:brightness-[1.08] enabled:active:brightness-[0.94] disabled:cursor-not-allowed disabled:bg-none disabled:bg-sand-deep disabled:text-mute';
 
-// The one keyboard focus indicator, shared with the guest language buttons:
-// the --color-focus token (brand evergreen at 70%, >=3:1 against the card and
-// panel surfaces) in the same 2px offset outline treatment.
-const FOCUS =
-  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus';
-
-function ErrorBanner({ message }: { message: string }) {
-  return (
-    <p
-      role="alert"
-      className="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm font-bold text-danger-ink"
-    >
-      {message}
-    </p>
-  );
-}
-
 export default function OperatorConsole() {
   const [token, setToken] = useState<string | null>(() =>
     localStorage.getItem(TOKEN_STORAGE_KEY)
@@ -78,28 +65,17 @@ export default function OperatorConsole() {
   const feedStateWs = useRef<WebSocket | null>(null);
   const streamWs = useRef<WebSocket | null>(null);
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
-  const audioContext = useRef<AudioContext | null>(null);
-  const processor = useRef<ScriptProcessorNode | null>(null);
-  const microphoneStream = useRef<MediaStream | null>(null);
   const isSendingAudio = useRef(false);
 
   const roomId = church?.rooms[0]?.id ?? null;
+  const audioInput = useAudioInput(Boolean(token) && church !== null && roomId !== null);
+  const { beginCapture, endCapture } = audioInput;
 
   const clearSession = useCallback(() => {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
     setToken(null);
     setChurch(null);
     setStatus('stopped');
-  }, []);
-
-  const teardownAudio = useCallback(() => {
-    isSendingAudio.current = false;
-    processor.current?.disconnect();
-    processor.current = null;
-    audioContext.current?.close();
-    audioContext.current = null;
-    microphoneStream.current?.getTracks().forEach((track) => track.stop());
-    microphoneStream.current = null;
   }, []);
 
   const disconnectSockets = useCallback(() => {
@@ -113,10 +89,10 @@ export default function OperatorConsole() {
 
   const handleLogout = useCallback(() => {
     clearSession();
-    teardownAudio();
+    endCapture();
     disconnectSockets();
     setError(null);
-  }, [clearSession, teardownAudio, disconnectSockets]);
+  }, [clearSession, endCapture, disconnectSockets]);
 
   // Restore the session: resolve the operator's church and rooms from the stored token.
   useEffect(() => {
@@ -172,13 +148,13 @@ export default function OperatorConsole() {
     };
   }, [roomId]);
 
-  // Tear everything down if the console is unmounted.
+  // Tear down the sockets if the console is unmounted; the audio hook owns its
+  // own stream and context and releases them on unmount through `enabled`.
   useEffect(
     () => () => {
-      teardownAudio();
       disconnectSockets();
     },
-    [teardownAudio, disconnectSockets]
+    [disconnectSockets]
   );
 
   const handleLogin = async (event: FormEvent) => {
@@ -241,39 +217,18 @@ export default function OperatorConsole() {
     socket.onopen = async () => {
       opened = true;
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        microphoneStream.current = stream;
-
-        const AudioContextCtor =
-          window.AudioContext ||
-          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        const context = new AudioContextCtor({ sampleRate: 16000 });
-        audioContext.current = context;
-
-        const source = context.createMediaStreamSource(stream);
-        const node = context.createScriptProcessor(4096, 1, 1);
-        processor.current = node;
-
-        node.onaudioprocess = (audioEvent: AudioProcessingEvent) => {
+        await beginCapture((pcm16) => {
           if (!isSendingAudio.current) return;
           if (socket.readyState !== WebSocket.OPEN) return;
-
-          const inputData = audioEvent.inputBuffer.getChannelData(0);
-          const pcm16 = new Int16Array(inputData.length);
-          for (let i = 0; i < inputData.length; i++) {
-            pcm16[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7fff;
-          }
           socket.send(pcm16.buffer);
-        };
-
-        source.connect(node);
-        node.connect(context.destination);
+        });
 
         isSendingAudio.current = true;
         await controlFeed('start');
       } catch {
-        setError('Microphone access failed. Check the mixer connection and permissions.');
-        teardownAudio();
+        // The audio panel owns the specific message (permission, device, rate).
+        isSendingAudio.current = false;
+        endCapture();
         if (streamWs.current === socket) {
           streamWs.current = null;
           socket.close();
@@ -282,7 +237,8 @@ export default function OperatorConsole() {
     };
 
     socket.onclose = () => {
-      teardownAudio();
+      isSendingAudio.current = false;
+      endCapture();
       if (streamWs.current === socket) {
         streamWs.current = null;
         setError(
@@ -292,7 +248,7 @@ export default function OperatorConsole() {
         );
       }
     };
-  }, [token, roomId, controlFeed, teardownAudio]);
+  }, [token, roomId, beginCapture, endCapture, controlFeed]);
 
   const handleStart = async () => {
     if (status === 'stopped') {
@@ -314,7 +270,8 @@ export default function OperatorConsole() {
   const handleStop = async () => {
     const ok = await controlFeed('stop');
     if (!ok) return;
-    teardownAudio();
+    isSendingAudio.current = false;
+    endCapture();
     const socket = streamWs.current;
     streamWs.current = null;
     socket?.close();
@@ -427,6 +384,10 @@ export default function OperatorConsole() {
           <div className="rounded-2xl border border-line-soft bg-sand-panel p-6.5 space-y-4.5">
             {error && <ErrorBanner message={error} />}
 
+            <AudioInputPanel audio={audioInput} />
+
+            <div className="border-t border-line-soft" />
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
               <button
                 onClick={handleStart}
@@ -455,7 +416,8 @@ export default function OperatorConsole() {
             </div>
 
             <p className="text-center text-[13px] text-dim">
-              {status === 'live' && 'Streaming the mixer feed. Translations are live.'}
+              {status === 'live' &&
+                `Streaming the ${audioInput.settings.mode === 'mixer' ? 'mixer' : 'microphone'} feed. Translations are live.`}
               {status === 'paused' && 'Feed paused. Guests see the Paused banner.'}
               {status === 'stopped' && 'Press Start when the sermon begins.'}
             </p>
